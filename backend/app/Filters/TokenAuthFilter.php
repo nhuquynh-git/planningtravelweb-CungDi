@@ -24,7 +24,10 @@ class TokenAuthFilter implements FilterInterface
      */
     protected array $publicRoutes = [
         'api/auth/register',
+        'api/auth/verify-otp',
+        'api/auth/resend-otp',
         'api/auth/login',
+        'api/auth/oauth',
         'api/health',
     ];
 

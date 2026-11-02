@@ -1,5 +1,5 @@
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api';
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 // Token storage key
 const TOKEN_KEY = 'auth_token';
@@ -28,14 +28,28 @@ async function request(endpoint, options = {}) {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-        // Include credentials for cookie-based auth
-        credentials: 'include',
-    });
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-    const data = await response.json();
+    let response;
+    try {
+        response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
+            ...options,
+            headers,
+            // Include credentials for cookie-based auth
+            credentials: 'include',
+        });
+    } catch (networkErr) {
+        throw new Error('Không thể kết nối đến máy chủ backend tại ' + API_BASE_URL + ' (Failed to fetch). Vui lòng kiểm tra backend server.');
+    }
+
+    let data;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+    } else {
+        const text = await response.text();
+        throw new Error(text || `Yêu cầu thất bại với mã trạng thái ${response.status}`);
+    }
 
     if (!response.ok) {
         // Handle 401 Unauthorized

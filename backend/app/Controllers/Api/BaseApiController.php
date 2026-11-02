@@ -7,6 +7,7 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class BaseApiController extends BaseController
 {
+    protected $helpers = ['cookie'];
     protected function success(
         $data = null,
         string $message = 'Success',

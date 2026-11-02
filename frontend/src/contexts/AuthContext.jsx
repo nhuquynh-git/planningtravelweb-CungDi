@@ -16,6 +16,21 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Fetch current user helper
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await api.get('/auth/me');
+      if (response.status === 'success' && response.data) {
+        setUser(response.data);
+        localStorage.setItem(USER_KEY, JSON.stringify(response.data));
+        return { success: true, user: response.data };
+      }
+    } catch (err) {
+      console.warn('Không thể lấy thông tin người dùng:', err.message);
+    }
+    return { success: false };
+  }, []);
+
   // Load user from storage on mount
   useEffect(() => {
     const initializeAuth = async () => {
@@ -48,53 +63,134 @@ export function AuthProvider({ children }) {
     initializeAuth();
   }, []);
 
+  // Lưu phiên đăng nhập (chỉ gọi khi chắc chắn có token)
+  const saveSession = useCallback((user, token) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setUser(user);
+  }, []);
+
   // Register new user
   const register = useCallback(async (credentials) => {
     setError(null);
     try {
       const response = await api.post('/auth/register', credentials);
-      
+
       if (response.status === 'success') {
-        const { user, token } = response.data;
-        
-        // Store token and user
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-        setUser(user);
-        
-        return { success: true, user, token };
+        const data = response.data || {};
+
+        // Cần xác nhận OTP: KHÔNG lưu token, KHÔNG set user
+        if (data.status === 'need_verification') {
+          return {
+            success: false,
+            needVerification: true,
+            email: data.email,
+            message: response.message,
+            otpPreview: data.otp_preview,
+          };
+        }
+
+        if (data.token && data.user) {
+          saveSession(data.user, data.token);
+          return { success: true, user: data.user, token: data.token };
+        }
       }
-      
+
       throw new Error(response.message || 'Đăng ký thất bại');
     } catch (err) {
       const message = err.message || 'Đăng ký thất bại. Vui lòng thử lại.';
       setError(message);
       return { success: false, error: message };
     }
-  }, []);
+  }, [saveSession]);
 
   // Login user
   const login = useCallback(async (credentials) => {
     setError(null);
     try {
       const response = await api.post('/auth/login', credentials);
-      
+
       if (response.status === 'success') {
-        const { user, token } = response.data;
-        
-        // Store token and user
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-        setUser(user);
-        
-        return { success: true, user, token };
+        const data = response.data || {};
+
+        if (data.status === 'need_verification') {
+          return {
+            success: false,
+            needVerification: true,
+            email: data.email,
+            message: response.message,
+            otpPreview: data.otp_preview,
+          };
+        }
+
+        if (data.token && data.user) {
+          saveSession(data.user, data.token);
+          return { success: true, user: data.user, token: data.token };
+        }
       }
-      
+
       throw new Error(response.message || 'Đăng nhập thất bại');
     } catch (err) {
       const message = err.message || 'Email hoặc mật khẩu không đúng';
       setError(message);
       return { success: false, error: message };
+    }
+  }, [saveSession]);
+
+  // Xác nhận OTP 6 số
+  const verifyOtp = async ({ email, otp }) => {
+    try {
+      clearError();
+
+      const response = await api.post("/auth/verify-otp", {
+        email,
+        otp,
+      });
+
+      const user = response.data?.data?.user;
+      const token = response.data?.data?.token;
+
+      if (!user || !token) {
+        throw new Error("Dữ liệu xác minh OTP không hợp lệ");
+      }
+
+      localStorage.setItem("accessToken", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      setUser(user);
+      setIsAuthenticated(true);
+
+      return {
+        success: true,
+        user,
+        token,
+      };
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Xác minh OTP thất bại";
+
+      setError(message);
+
+      return {
+        success: false,
+        message,
+      };
+    }
+  };
+
+  // Gửi lại OTP
+  const resendOtp = useCallback(async (email) => {
+    try {
+      const response = await api.post('/auth/resend-otp', { email });
+      return {
+        success: true,
+        message: response.message,
+        otpPreview: response.data?.otp_preview,
+      };
+    } catch (err) {
+      return { success: false, error: err.message || 'Không thể gửi lại mã' };
     }
   }, []);
 
@@ -118,7 +214,7 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const response = await api.put('/auth/profile', data);
-      
+
       if (response.status === 'success') {
         // Update local user state with new profile
         const updatedUser = {
@@ -127,10 +223,10 @@ export function AuthProvider({ children }) {
         };
         setUser(updatedUser);
         localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
-        
+
         return { success: true };
       }
-      
+
       throw new Error(response.message || 'Cập nhật thất bại');
     } catch (err) {
       const message = err.message || 'Cập nhật hồ sơ thất bại';
@@ -162,8 +258,11 @@ export function AuthProvider({ children }) {
     hasPermission,
     register,
     login,
+    verifyOtp,     // mới
+    resendOtp,     // mới
     logout,
     updateProfile,
+    fetchCurrentUser,
     clearError: () => setError(null),
   };
 
@@ -191,10 +290,10 @@ export function useAuth() {
  */
 export function useRequireAuth() {
   const { isAuthenticated, loading } = useAuth();
-  
+
   if (loading) {
     return { isAuthenticated: false, loading: true };
   }
-  
+
   return { isAuthenticated, loading: false };
 }

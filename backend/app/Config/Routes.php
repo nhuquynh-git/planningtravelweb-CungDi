@@ -1,4 +1,3 @@
-
 <?php
 
 use CodeIgniter\Router\RouteCollection;
@@ -19,8 +18,20 @@ $routes->group('api', ['filter' => 'cors'], function ($routes) {
     // Auth Routes (public)
     $routes->group('auth', function ($routes) {
         $routes->post('register', 'Api\Auth::register');
+        $routes->post('verify-otp', 'Api\Auth::verifyOtp');
+        $routes->post('resend-otp', 'Api\Auth::resendOtp');
         $routes->post('login', 'Api\Auth::login');
         $routes->post('logout', 'Api\Auth::logout');
+
+        // OAuth Routes - Google & Facebook
+        $routes->get('oauth/google', 'Api\Auth::oauthGoogle');
+        $routes->get('oauth/google/callback', 'Api\Auth::oauthGoogleCallback');
+        $routes->post('oauth/google/verify', 'Api\Auth::oauthGoogleVerify');
+
+        $routes->get('oauth/facebook', 'Api\Auth::oauthFacebook');
+        $routes->get('oauth/facebook/callback', 'Api\Auth::oauthFacebookCallback');
+        $routes->post('oauth/facebook/verify', 'Api\Auth::oauthFacebookVerify');
+
         $routes->options('(:any)', 'Api\Auth::options');
     });
 
