@@ -1,0 +1,23 @@
+
+.app {
+    max-width: 800px;
+    margin: 50px auto;
+    padding: 24px;
+    font-family: Arial, sans-serif;
+}
+
+h1 {
+    color: #2563eb;
+}
+
+.data-item {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f9fafb;
+}
+
+.error {
+    color: red;
+}

@@ -1,0 +1,39 @@
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Node.js / React
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# PHP / Composer
+backend/vendor/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.swp
+*.bak
+
+# Docker
+# Do not ignore compose.yaml or Dockerfile
+
+# Testing / coverage
+coverage/
+.phpunit.cache/
