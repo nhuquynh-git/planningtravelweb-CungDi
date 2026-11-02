@@ -1,55 +1,64 @@
 
 import { useEffect, useState } from "react";
+import { getHealth } from "./services/healthService";
 import "./App.css";
 
 function App() {
-    const [data, setData] = useState([]);
+    const [health, setHealth] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
     useEffect(() => {
-        fetch("http://localhost:8001")
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Không thể kết nối API");
+        const checkBackend = async () => {
+            try {
+                const result = await getHealth();
+
+                if (result.status !== "success") {
+                    throw new Error(result.message || "API không hoạt động");
                 }
 
-                return response.json();
-            })
-            .then((result) => {
-                if (!result.success) {
-                    throw new Error(result.message);
-                }
-
-                setData(result.data);
-            })
-            .catch((err) => {
-                setError(err.message);
-            })
-            .finally(() => {
+                setHealth(result.data);
+            } catch (err) {
+                setError(err.message || "Không thể kết nối Backend");
+            } finally {
                 setLoading(false);
-            });
+            }
+        };
+
+        checkBackend();
     }, []);
 
     return (
         <div className="app">
             <h1>Travel Planner</h1>
-            <h2>React + PHP + MySQL</h2>
+            <h2>React + CodeIgniter 4 + MySQL</h2>
 
-            {loading && <p>Đang tải dữ liệu...</p>}
+            {loading && <p>Đang kiểm tra kết nối...</p>}
 
-            {error && <p className="error">{error}</p>}
+            {error && (
+                <div className="error">
+                    <p>Backend: Không kết nối được</p>
+                    <p>{error}</p>
+                </div>
+            )}
 
-            {!loading && !error && (
-                <div>
-                    <h3>Dữ liệu từ MySQL</h3>
+            {!loading && !error && health && (
+                <div className="data-item">
+                    <h3>Trạng thái hệ thống</h3>
 
-                    {data.map((item) => (
-                        <div className="data-item" key={item.id}>
-                            <p>ID: {item.id}</p>
-                            <p>Message: {item.message}</p>
-                        </div>
-                    ))}
+                    <p>
+                        Backend: {health.status === "success"
+                            ? "Đang hoạt động"
+                            : "Không hoạt động"}
+                    </p>
+
+                    <p>Message: {result.message}</p>
+
+                    <p>
+                        MySQL: {health.database === "connected"
+                            ? "Đã kết nối"
+                            : "Chưa kết nối"}
+                    </p>
                 </div>
             )}
         </div>
