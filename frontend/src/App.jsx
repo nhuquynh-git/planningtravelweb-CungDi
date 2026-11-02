@@ -52,7 +52,7 @@ function App() {
                             : "Không hoạt động"}
                     </p>
 
-                    <p>Message: {result.message}</p>
+                    <p>Message: {health.message}</p>
 
                     <p>
                         MySQL: {health.database === "connected"
