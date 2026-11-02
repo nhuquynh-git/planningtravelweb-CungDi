@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { getHealth } from "./services/healthService";
+import { LoadingStatus } from "./components";
 import "./App.css";
 
 function App() {
@@ -33,7 +34,7 @@ function App() {
             <h1>Travel Planner</h1>
             <h2>React + CodeIgniter 4 + MySQL</h2>
 
-            {loading && <p>Đang kiểm tra kết nối...</p>}
+            {loading && <LoadingStatus label="Đang kiểm tra kết nối..." />}
 
             {error && (
                 <div className="error">

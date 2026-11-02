@@ -78,8 +78,8 @@ does not authorize one member to decide these alone.
 **Purpose**: Make the existing repository easy for a four-person team to build
 and validate without duplicating already-installed frameworks.
 
-- [ ] T001 [P] [DOC] Update `README.md` with the verified frontend, backend, and Docker Compose startup steps and links to `.specify/specs/001-travel-planner-product/quickstart.md`; retain the existing stack and warn against committing local secrets or deleting database volumes.
-- [ ] T002 [P] [DOC] Add `docs/development/team-workflow.md` describing branch-per-task, pull-request review, API/schema change coordination, and a neutral four-workstream handoff format without naming or assigning members.
+- [x] T001 [P] [DOC] Update `README.md` with the verified frontend, backend, and Docker Compose startup steps and links to `.specify/specs/001-travel-planner-product/quickstart.md`; retain the existing stack and warn against committing local secrets or deleting database volumes.
+- [x] T002 [P] [DOC] Add `docs/development/team-workflow.md` describing branch-per-task, pull-request review, API/schema change coordination, and a neutral four-workstream handoff format without naming or assigning members.
 
 ## Phase 2: Foundational — Shared Infrastructure & Integration
 
@@ -93,14 +93,14 @@ independently.
 - [x] T005 [DOC] Reconcile the stale unresolved-decision summary in `.specify/specs/001-travel-planner-product/plan.md` with the current `spec.md` and its decision table; preserve Q-016/Q-017a/Q-018a/Q-018b/Q-024 as resolved and list only genuinely deferred gates without inventing answers.
 - [x] T006 [BE][DOC] Record the approved Shield Access Token policy for Q-015b in `.specify/specs/001-travel-planner-product/spec.md`, `.specify/specs/001-travel-planner-product/plan.md`, `.specify/specs/001-travel-planner-product/research.md` and `.specify/specs/001-travel-planner-product/contracts/api-contract.md`: expire after 7 days without use, revoke the current token server-side on logout, and store it in an HttpOnly cookie. Record approved controls: production Secure, SameSite=Lax, configured-origin credentialed CORS, and CSRF token plus Origin/Referer validation; verify the Shield cookie bridge and cookie renewal in implementation.
 - [x] T007 [P] [BE][TEST] Add focused feature tests in `backend/tests/feature/Api/ResponseEnvelopeTest.php` for the existing `backend/app/Controllers/Api/BaseApiController.php` success/error envelope, field errors, and non-leaking failures; preserve the current `status`, `message`, `data`, and optional `errors` shape.
-- [ ] T008 [P] [FE] Build reusable loading, empty, validation-error, permission-denied, and confirmation components under `frontend/src/components/`; use semantic controls and keyboard-operable dialogs without adding a UI framework.
-- [ ] T009 [P] [DB][TEST] Configure an isolated MySQL 8.4 integration-test setup in `backend/tests/Support/DatabaseTestCase.php` and the existing PHPUnit configuration; prove tests do not target the developer or production database and document the command in `backend/README.md`.
+- [x] T008 [P] [FE] Build reusable loading, empty, validation-error, permission-denied, and confirmation components under `frontend/src/components/`; use semantic controls and keyboard-operable dialogs without adding a UI framework.
+- [x] T009 [P] [DB][TEST] Configure an isolated MySQL 8.4 integration-test setup in `backend/tests/Support/DatabaseTestCase.php` and the existing PHPUnit configuration; prove tests do not target the developer or production database and document the command in `backend/README.md`.
 
 **Checkpoint**: The API contract is recorded, the initial Plan schema is
 implemented under Product Owner authorization, and base API behavior has tests.
-Team review remains pending under T004; the isolated integration-test path is
-pending under T009. Protected-feature token flow remains gated on verified
-cookie-to-Shield integration and security controls.
+Shared UI feedback components and the isolated MySQL PHPUnit path are in place.
+Team review remains pending under T004. Protected-feature token flow remains
+gated on verified cookie-to-Shield integration and security controls.
 
 ## Phase 3: User Story 1 — Authentication & User (P1, proposed)
 

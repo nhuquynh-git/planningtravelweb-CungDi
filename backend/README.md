@@ -1,3 +1,41 @@
+# Backend (CodeIgniter 4)
+
+API Cùng Đi chạy dưới tiền tố `/api`. Khởi động Docker và frontend: xem README gốc repo và [quickstart](../.specify/specs/001-travel-planner-product/quickstart.md).
+
+## Isolated MySQL tests (T009)
+
+PHPUnit **không** được trỏ vào `travel_planner_db` (database phát triển) hay production. Nhóm kết nối `tests` dùng MySQL 8.4 database `travel_planner_test`.
+
+Tạo database test (Compose đang chạy):
+
+```powershell
+docker compose exec -T db sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" < /docker-entrypoint-initdb.d/create-test-db.sql"
+```
+
+`create-test-db.sql` nằm ở `database/create-test-db.sql` trên host. Nếu file chưa mount vào container, copy nội dung vào `mysql` client:
+
+```powershell
+Get-Content ..\database\create-test-db.sql -Raw | docker compose exec -T db sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\""
+```
+
+File SQL chỉ `CREATE DATABASE` / `GRANT` cho `travel_planner_test`, không đụng `travel_planner_db`.
+
+Chạy toàn bộ suite trên máy host (cổng MySQL `3308`):
+
+```powershell
+composer test
+```
+
+Chỉ kiểm tra cô lập kết nối:
+
+```powershell
+vendor\bin\phpunit tests\feature\Database\DatabaseIsolationTest.php
+```
+
+Trong `backend/.env`, `database.tests.database` phải khác `database.default.database` và phải chứa chuỗi `test`. Không copy mật khẩu production vào nhóm `tests`.
+
+---
+
 # CodeIgniter 4 Application Starter
 
 ## What is CodeIgniter?

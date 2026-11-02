@@ -3,6 +3,7 @@
 namespace Config;
 
 use CodeIgniter\Database\Config;
+use RuntimeException;
 
 /**
  * Database Configuration
@@ -167,19 +168,19 @@ class Database extends Config
         'hostname'    => '127.0.0.1',
         'username'    => '',
         'password'    => '',
-        'database'    => ':memory:',
-        'DBDriver'    => 'SQLite3',
-        'DBPrefix'    => 'db_',  // Needed to ensure we're working correctly with prefixes live. DO NOT REMOVE FOR CI DEVS
+        'database'    => 'travel_planner_test',
+        'DBDriver'    => 'MySQLi',
+        'DBPrefix'    => '',
         'pConnect'    => false,
         'DBDebug'     => true,
-        'charset'     => 'utf8',
-        'DBCollat'    => '',
+        'charset'     => 'utf8mb4',
+        'DBCollat'    => 'utf8mb4_general_ci',
         'swapPre'     => '',
         'encrypt'     => false,
         'compress'    => false,
         'strictOn'    => true,
         'failover'    => [],
-        'port'        => 3306,
+        'port'        => 3308,
         'foreignKeys' => true,
         'busyTimeout' => 1000,
         'synchronous' => null,
@@ -199,6 +200,33 @@ class Database extends Config
         // we don't overwrite live data on accident.
         if (ENVIRONMENT === 'testing') {
             $this->defaultGroup = 'tests';
+            $this->guardIsolatedTestDatabase();
+        }
+    }
+
+    /**
+     * Refuse to run PHPUnit against the developer or production schema.
+     */
+    private function guardIsolatedTestDatabase(): void
+    {
+        $database = (string) ($this->tests['database'] ?? '');
+        $default  = (string) ($this->default['database'] ?? '');
+        $driver   = (string) ($this->tests['DBDriver'] ?? '');
+
+        if ($driver !== 'MySQLi') {
+            throw new RuntimeException('PHPUnit tests must use MySQLi and an isolated MySQL 8.4 database.');
+        }
+
+        if ($database === '' || $database === ':memory:' || strcasecmp($database, 'travel_planner_db') === 0) {
+            throw new RuntimeException('PHPUnit tests must not use the development database or an empty DSN.');
+        }
+
+        if ($default !== '' && strcasecmp($database, $default) === 0) {
+            throw new RuntimeException('PHPUnit tests must not reuse database.default.database.');
+        }
+
+        if (! str_contains(strtolower($database), 'test')) {
+            throw new RuntimeException('PHPUnit tests database name must include "test".');
         }
     }
 }
