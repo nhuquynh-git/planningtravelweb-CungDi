@@ -25,12 +25,12 @@
 ## Feature Readiness
 
 - [x] All functional requirements have clear acceptance criteria or are explicitly gated on a listed decision
-- [x] User stories cover primary flows; Admin remains blocked pending an approved use case
+- [x] User stories cover primary flows, including the approved Admin workflows
 - [x] Feature meets measurable outcomes defined in Success Criteria, subject to confirmation of proposed scope
 - [x] No implementation details leak into functional requirements
 
 ## Notes
 
-- The product baseline is a Draft. Proposed workflows and open questions must be approved before implementation planning.
+- The product baseline is a Draft. Clarified core scope is recorded in the spec; remaining decisions have explicit statuses and gates in §12, and must not be inferred during planning or implementation.
 - Repository observations are separated from requirements and do not claim that business features, an ERD, Figma designs, or deployment are complete.
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
+- The prior Admin checklist wording was stale: Admin CRUD/audit and minigame moderation were approved and are now covered by User Story 7. Remaining decisions and the stage at which to resolve them are tracked in §12 of the spec.
