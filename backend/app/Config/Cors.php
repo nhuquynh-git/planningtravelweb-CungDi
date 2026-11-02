@@ -27,11 +27,13 @@ class Cors extends BaseConfig
     public array $default = [
         'allowedOrigins' => [
             'http://localhost:5173',
+            'http://127.0.0.1:5173',
         ],
 
         'allowedOriginsPatterns' => [],
 
-        'supportsCredentials' => false,
+        // Required for cookie-based authentication
+        'supportsCredentials' => true,
 
         'allowedHeaders' => [
             'Accept',
@@ -39,9 +41,12 @@ class Cors extends BaseConfig
             'Authorization',
             'X-Requested-With',
             'Origin',
+            'X-CSRF-Token',
         ],
 
-        'exposedHeaders' => [],
+        'exposedHeaders' => [
+            'Authorization',
+        ],
 
         'allowedMethods' => [
             'GET',

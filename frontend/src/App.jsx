@@ -1,68 +1,111 @@
 
-import { useEffect, useState } from "react";
-import { getHealth } from "./services/healthService";
-import { LoadingStatus } from "./components";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Home from "./pages/Home";
 import "./App.css";
 
-function App() {
-    const [health, setHealth] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+/**
+ * Protected Route Component
+ * Redirects to login if user is not authenticated
+ */
+function ProtectedRoute({ children }) {
+    const { isAuthenticated, loading } = useAuth();
 
-    useEffect(() => {
-        const checkBackend = async () => {
-            try {
-                const result = await getHealth();
+    if (loading) {
+        return (
+            <div className="app">
+                <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>Đang tải...</p>
+                </div>
+            </div>
+        );
+    }
 
-                if (result.status !== "success") {
-                    throw new Error(result.message || "API không hoạt động");
-                }
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
 
-                setHealth(result.data);
-            } catch (err) {
-                setError(err.message || "Không thể kết nối Backend");
-            } finally {
-                setLoading(false);
-            }
-        };
+    return children;
+}
 
-        checkBackend();
-    }, []);
+/**
+ * Public Route Component
+ * Redirects to home if user is already authenticated
+ */
+function PublicRoute({ children }) {
+    const { isAuthenticated, loading } = useAuth();
 
+    if (loading) {
+        return (
+            <div className="app">
+                <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>Đang tải...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (isAuthenticated) {
+        return <Navigate to="/" replace />;
+    }
+
+    return children;
+}
+
+/**
+ * Main App Routes
+ */
+function AppRoutes() {
     return (
-        <div className="app">
-            <h1>Travel Planner</h1>
-            <h2>React + CodeIgniter 4 + MySQL</h2>
+        <Routes>
+            {/* Public Routes */}
+            <Route 
+                path="/login" 
+                element={
+                    <PublicRoute>
+                        <Login />
+                    </PublicRoute>
+                } 
+            />
+            <Route 
+                path="/register" 
+                element={
+                    <PublicRoute>
+                        <Register />
+                    </PublicRoute>
+                } 
+            />
+            
+            {/* Protected Routes */}
+            <Route 
+                path="/" 
+                element={
+                    <ProtectedRoute>
+                        <Home />
+                    </ProtectedRoute>
+                } 
+            />
+            
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+    );
+}
 
-            {loading && <LoadingStatus label="Đang kiểm tra kết nối..." />}
-
-            {error && (
-                <div className="error">
-                    <p>Backend: Không kết nối được</p>
-                    <p>{error}</p>
-                </div>
-            )}
-
-            {!loading && !error && health && (
-                <div className="data-item">
-                    <h3>Trạng thái hệ thống</h3>
-
-                    <p>
-                        Backend: {health.status === "success"
-                            ? "Đang hoạt động"
-                            : "Không hoạt động"}
-                    </p>
-
-                    <p>Message: {health.message}</p>
-
-                    <p>
-                        MySQL: {health.database === "connected"
-                            ? "Đã kết nối"
-                            : "Chưa kết nối"}
-                    </p>
-                </div>
-            )}
-        </div>
+/**
+ * Root App Component
+ */
+function App() {
+    return (
+        <BrowserRouter>
+            <AuthProvider>
+                <AppRoutes />
+            </AuthProvider>
+        </BrowserRouter>
     );
 }
 
