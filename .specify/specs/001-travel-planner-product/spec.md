@@ -105,9 +105,16 @@ hoặc lặp lại các quyết định đó.
 - Q: Minigame muốn được lọc theo “thể loại” thì mỗi bài nên chọn thể loại theo cách nào? → A: Chọn thể loại từ danh mục thống nhất và có thể thêm từ khóa tự do.
 - Q: Chi phí cá nhân có thể được ghi độc lập ngoài Plan nhóm không, hay mọi khoản chi đều phải thuộc một Plan? → A: Mọi khoản chi đều thuộc một Plan; chi phí cá nhân được ghi trong Plan riêng có thể chỉ gồm chủ sở hữu.
 - Q: Người thanh toán một khoản chi trong Plan nhóm có bắt buộc là thành viên Plan đó không? → A: Có; người thanh toán phải là thành viên hiện tại của Plan.
+- Q: Khi tạo một khoản chi, ngày/giờ, ghi chú và địa điểm nào cần bắt buộc lưu? → A: Ngày bắt buộc; ghi chú và địa điểm tùy chọn.
+- Q: Plan có thể chỉ diễn ra trong một ngày không, và giờ bắt đầu/kết thúc của hoạt động lịch trình có được để trống không? → A: Plan một ngày được phép; giờ bắt đầu và kết thúc đều có thể để trống độc lập; nếu cả hai được nhập thì giờ kết thúc phải sau giờ bắt đầu.
+- Q: Khi tác giả sửa bài Minigame đã được duyệt, nội dung sửa có cần Admin duyệt lại trước khi công khai không? → A: Không; tác giả sửa bài của mình thì nội dung cập nhật công khai ngay, không cần duyệt lại.
+- Q: Database nên lưu số người phù hợp, thời lượng và thể loại của mỗi bài Minigame theo cấu trúc nào để hỗ trợ lọc và gợi ý? → A: Số người tối thiểu/tối đa và thời lượng phút là số nguyên tùy chọn; thể loại dùng danh mục thống nhất và bảng nối; từ khóa tự do lưu riêng.
+- Q: Với bình luận và báo cáo Minigame, ai được sửa/xóa bình luận, và mỗi báo cáo cần lưu lý do cùng kết quả xử lý nào? → A: Tác giả được sửa/xóa bình luận của mình; mỗi User báo cáo một lần cho mỗi bài với lý do văn bản bắt buộc; Admin xử lý giữ nguyên/ẩn/xóa bài; bài bị xóa được giữ bằng trạng thái xóa mềm để báo cáo vẫn tham chiếu được.
 - Q: Những thông tin nào phải có để User đăng một bài minigame? → A: Tên và luật/hướng dẫn chơi là bắt buộc; mô tả, ảnh, số người chơi, thời lượng, dụng cụ và thể loại có thể để trống.
 - Q: Sau khi User đăng bài minigame hợp lệ, bài đó nên được Guest xem ngay hay phải chờ Admin duyệt? → A: Bài phải chờ Admin duyệt trước khi công khai.
 - Q: Khi Admin tạo Plan, ai nên là chủ sở hữu của Plan đó? → A: Admin trở thành chủ sở hữu của Plan mình tạo.
+- Q: Chọn thời hạn, thu hồi và lưu trữ Shield Access Token như thế nào? → A: Token hết hạn sau 7 ngày không sử dụng; đăng xuất thu hồi token hiện tại ở phía máy chủ; trình duyệt lưu token trong cookie HttpOnly. Người dùng cũng duyệt hướng bảo vệ cookie: HttpOnly, Secure ở production, SameSite=Lax, CORS credentials chỉ cho origin frontend đã cấu hình, và CSRF token kết hợp kiểm tra Origin/Referer cho request thay đổi dữ liệu.
+- Q: Audit log được lưu ở đâu, giữ trong bao lâu và ai được đọc? → A: Lưu trong MySQL `travel_planner_db`, giữ không thời hạn; Admin và người vận hành hệ thống được đọc. Không tạo role nghiệp vụ mới; quyền vận hành phải được giới hạn bằng cơ chế truy cập hệ thống phù hợp.
 
 ## 2. Người dùng và phạm vi quyền
 
@@ -185,7 +192,7 @@ phạm vi thực thi:
 | Mandatory | Nghĩa vụ IS207 được liệt kê tại §3.1: khảo sát, phân tích vai trò, ERD/3NF, UML, UI/UX, công nghệ, CRUD, tìm kiếm, hiển thị, thống kê, in, email, kiểm thử, triển khai và báo cáo. | Bắt buộc theo yêu cầu học phần được người dùng cung cấp; từng chức năng phải gắn với workflow có ý nghĩa. |
 | Core | Lập kế hoạch du lịch một điểm đến, có lịch trình hoạt động theo ngày, và quản lý/chia chi phí cá nhân/nhóm trong Plan. Mọi khoản chi thuộc một Plan; chi phí cá nhân thuộc Plan riêng có thể chỉ có chủ sở hữu. | README và phạm vi nghiệp vụ được người dùng xác nhận; Q-016. Chủ Plan thêm trực tiếp User đã đăng ký; chỉ chủ Plan và thành viên được thêm xem Plan/chi phí nhóm. Mô hình chi phí và chính sách xóa đã làm rõ. |
 | Core | Admin quản lý mọi Plan và khoản chi; đồng thời kiểm duyệt bài minigame vi phạm. | Người dùng đã xác nhận quyền tạo/xem/sửa/xóa mọi Plan và khoản chi; không bao gồm tự động quản lý tài khoản User hoặc nội dung khác. |
-| Core | Cộng đồng chia sẻ bài đăng thông tin minigame để khám phá và tham khảo khi du lịch nhóm. | User đã đăng nhập đăng/sửa/xóa bài của mình; tên và luật/hướng dẫn chơi là bắt buộc, các trường khác tùy chọn; bài chờ Admin duyệt trước khi Guest đọc được; Admin xử lý báo cáo và có thể giữ, ẩn hoặc xóa bài vi phạm. Chi tiết xử lý khi sửa bài đã công khai cần chốt trước triển khai. Chỉ là nội dung thông tin. |
+| Core | Cộng đồng chia sẻ bài đăng thông tin minigame để khám phá và tham khảo khi du lịch nhóm. | User đã đăng nhập đăng/sửa/xóa bài của mình; tên và luật/hướng dẫn chơi là bắt buộc, các trường khác tùy chọn; bài mới chờ Admin duyệt trước khi Guest đọc được; tác giả sửa bài đã duyệt thì nội dung cập nhật công khai ngay; Admin xử lý báo cáo và có thể giữ, ẩn hoặc xóa mềm bài vi phạm. Chỉ là nội dung thông tin. |
 | Core | Tìm kiếm/lọc minigame; lượt thích, bình luận, yêu thích; báo cáo và kiểm duyệt (Admin ẩn/xóa bài vi phạm); gợi ý minigame theo Plan. | Người dùng đã xác nhận nhóm chức năng phiên bản đầu; thể loại dùng danh mục thống nhất kèm từ khóa tự do tùy chọn. Chi tiết gợi ý, bình luận và xử lý báo cáo vẫn cần đặc tả. |
 | Optional | Lưu/liên kết bài minigame vào Plan như nội dung tham khảo; đây không phải khởi tạo phiên chơi. | Chưa được xác nhận và không nằm trong lựa chọn chức năng cộng đồng phiên bản đầu. |
 | Out of Scope | Chơi minigame trực tuyến, phòng chơi, xử lý lượt chơi hoặc trạng thái trận; cổng thanh toán, giao dịch tiền thật/hoàn tiền tự động cho chi phí. | Người dùng loại trừ rõ ràng; Plan chỉ có thể lưu/tham khảo minigame nếu sau này được duyệt. |
@@ -229,11 +236,20 @@ cấp quyền.
    cập.
 3. **Given** đăng nhập thành công, **When** người dùng mở khu vực cá nhân,
    **Then** hệ thống chỉ hiển thị tài nguyên được phép truy cập.
+4. **Given** User đăng nhập thành công, **When** gọi API được bảo vệ, **Then**
+   trình duyệt gửi Access Token qua cookie HttpOnly mà JavaScript không đọc
+   được; token hết hạn nếu không được sử dụng trong 7 ngày.
+5. **Given** User đăng xuất, **When** yêu cầu đăng xuất hoàn tất, **Then**
+   máy chủ thu hồi token hiện tại và token đó không thể xác thực yêu cầu tiếp
+   theo; token khác của User không bị thu hồi theo quyết định này.
 
 **Ghi chú phạm vi**: Khôi phục mật khẩu qua email thuộc phạm vi email đã xác
-nhận. Cách xác minh địa chỉ, vòng đời token, lưu trữ thông tin xác thực và đăng
-xuất cần được chốt trong thiết kế phù hợp; đặc tả không chọn phương án lưu
-token.
+nhận. Xác minh email vẫn được hoãn. Cookie production phải dùng HTTPS và cờ Secure.
+Cookie dùng SameSite=Lax; CORS credentials chỉ cho origin frontend được cấu
+hình. Request thay đổi dữ liệu phải có CSRF token và kiểm tra Origin/Referer.
+Shield hiện đọc token từ Authorization header nên cần kiểm chứng filter bridge
+đọc cookie HttpOnly trước khi xác thực. Không bổ sung refresh token nếu chưa
+được duyệt.
 
 ### User Story 2 — Quản lý kế hoạch du lịch cá nhân (Ưu tiên: P1, luồng cốt lõi đã xác nhận)
 
@@ -339,7 +355,8 @@ thực hiện giao dịch tiền thật. Nhiều khoản chi có thể cùng g�
 điểm. Bảng thành viên × địa điểm là tổng hợp từ các bản ghi khoản chi, không
 thay thế chứng từ từng khoản.
 
-**Quy tắc đã làm rõ**: Mọi khoản chi thuộc một Plan. Chi phí cá nhân được ghi
+**Quy tắc đã làm rõ**: Ngày chi là bắt buộc; ghi chú và địa điểm Plan là tùy
+chọn. Mọi khoản chi thuộc một Plan. Chi phí cá nhân được ghi
 trong Plan riêng, có thể chỉ gồm chủ sở hữu; không có khoản chi độc lập ngoài
 Plan. Trong Plan nhóm, người thanh toán phải là thành viên hiện tại của Plan.
 
@@ -437,11 +454,12 @@ chơi.
    **Then** trạng thái tương ứng được ghi nhận; thao tác lặp không tạo lượt
    thích/yêu thích trùng.
 8. **Given** User đã đăng nhập gửi bình luận hợp lệ, **When** mở bài đăng,
-   **Then** bình luận được gắn với tác giả và thời điểm; nội dung sai/thiếu bị
-   từ chối.
-9. **Given** User đã đăng nhập báo cáo một bài, **When** Admin kiểm duyệt báo cáo,
-   **Then** Admin có thể giữ nguyên hoặc ẩn/xóa bài vi phạm; nội dung đã ẩn
-   không còn xuất hiện với Guest.
+   **Then** bình luận được gắn với tác giả và thời điểm; tác giả có thể sửa/xóa
+   bình luận của mình; nội dung sai/thiếu bị từ chối.
+9. **Given** User đã đăng nhập báo cáo một bài với lý do văn bản, **When** Admin
+   kiểm duyệt báo cáo, **Then** mỗi User chỉ có một báo cáo cho mỗi bài; Admin
+   có thể giữ nguyên, ẩn hoặc xóa mềm bài; báo cáo chuyển sang đã xử lý và bài
+   đã ẩn/xóa không còn xuất hiện với Guest.
 10. **Given** người dùng tìm hoặc lọc theo số người, thời lượng hoặc thể loại,
     **When** có bài phù hợp, **Then** kết quả chỉ chứa bài thỏa điều kiện;
     thể loại được chọn từ danh mục thống nhất và có thể kèm từ khóa tự do.
@@ -500,7 +518,7 @@ vì chúng có mã FR; cần xác nhận qua Open Questions trước khi lập k
 | FR-003 | Hệ thống MUST bảo vệ dữ liệu riêng tư bằng xác thực, kiểm tra quyền và kiểm tra quyền sở hữu ở mọi thao tác liên quan. | Đã xác nhận theo Constitution |
 | FR-004 | Guest MUST có thể tiếp cận luồng đăng ký/đăng nhập và đọc bài minigame đã công khai; loại nội dung công khai khác cần phê duyệt. | Đã làm rõ một phần |
 | FR-005 | User MUST có thể tạo, xem, cập nhật và xóa kế hoạch thuộc quyền sở hữu của mình. | Đã xác nhận |
-| FR-006 | Mỗi Plan MUST có đúng một điểm đến, chọn từ dịch vụ tìm kiếm bên ngoài hoặc nhập thủ công khi dịch vụ không khả dụng; lựa chọn từ dịch vụ MUST lưu mã điểm đến do nhà cung cấp trả về cùng tên hiển thị, và địa chỉ/tọa độ nếu có. Plan MUST hỗ trợ lịch trình hoạt động theo ngày; mỗi hoạt động có tên, giờ bắt đầu/kết thúc, địa điểm, hướng dẫn và ghi chú. Mặc định MUST sắp xếp hoạt động theo giờ bắt đầu, giữ thứ tự thêm khi giờ trùng; User MAY chuyển sang thứ tự thủ công và giữ thứ tự đó đến khi chọn lại sắp xếp theo giờ. Hệ thống MUST từ chối khoảng ngày không hợp lệ. Nhà cung cấp cụ thể cần được chốt trước khi duyệt form. | Đã làm rõ một phần |
+| FR-006 | Mỗi Plan MUST có đúng một điểm đến, chọn từ dịch vụ tìm kiếm bên ngoài hoặc nhập thủ công khi dịch vụ không khả dụng; lựa chọn từ dịch vụ MUST lưu mã điểm đến do nhà cung cấp trả về cùng tên hiển thị, và địa chỉ/tọa độ nếu có. Plan MUST hỗ trợ lịch trình hoạt động theo ngày; Plan một ngày được phép. Mỗi hoạt động có ngày trong phạm vi Plan, tên, giờ bắt đầu và giờ kết thúc tùy chọn độc lập, địa điểm, hướng dẫn và ghi chú. Nếu cả hai giờ được nhập, giờ kết thúc MUST sau giờ bắt đầu. Hoạt động có giờ bắt đầu MUST được sắp xếp mặc định theo giờ đó; giờ trùng giữ thứ tự thêm. User MAY chuyển sang thứ tự thủ công và giữ thứ tự đó đến khi chọn lại sắp xếp theo giờ. Hệ thống MUST từ chối khoảng ngày không hợp lệ. Nhà cung cấp cụ thể cần được chốt trước khi duyệt form. | Đã làm rõ một phần |
 | FR-007 | Trong Plan nhóm, chủ Plan MUST có thể thêm User đã đăng ký vào danh sách thành viên và thêm, xem, sửa, xóa mọi khoản chi; thành viên được thêm MUST chỉ được xem Plan/chi phí; người ngoài Plan MUST không được truy cập. Plan nhóm MUST NOT được chia sẻ công khai. | Đã làm rõ |
 | FR-008 | Với Plan nhóm, mỗi khoản chi MUST có đúng một người thanh toán là thành viên hiện tại của Plan và phần chịu chi cho một hoặc nhiều thành viên; cách phân bổ cho từng khoản MUST là chia đều hoặc số tiền tùy chỉnh nguyên VND. Khi chia đều có phần dư VND, hệ thống MUST phân bổ từng đồng dư theo thứ tự thành viên trong Plan để tổng phần chịu khớp khoản chi. Hệ thống MUST tính chênh lệch nhưng MUST NOT ghi nhận hoàn trả hoặc thực hiện giao dịch tiền thật. | Đã làm rõ |
 | FR-009 | Hệ thống MUST tính tổng Plan, tổng đã thanh toán theo thành viên, tổng phần chịu theo thành viên và chênh lệch từ các khoản chi còn hiệu lực bằng VND; phần chịu tùy chỉnh MUST là số nguyên VND và các phần chịu MUST cộng đúng tổng khoản chi. | Core; phép tính và đơn vị tiền tệ đã được xác nhận |
@@ -519,9 +537,9 @@ vì chúng có mã FR; cần xác nhận qua Open Questions trước khi lập k
 | FR-022 | Các hợp đồng trao đổi, trường dữ liệu và quy tắc chi tiết MUST được chốt sau khi xác nhận quy trình; đặc tả này không ấn định danh sách giao tiếp hoặc lược đồ vật lý. | Ràng buộc phạm vi |
 | FR-023 | Mỗi khoản chi nhóm MUST có đúng một người thanh toán là thành viên hiện tại của Plan và một hoặc nhiều phần chịu được phân bổ theo từng khoản bằng chia đều hoặc số tiền tùy chỉnh nguyên VND; tổng các phần chịu MUST bằng số tiền khoản chi. Khi chia đều có phần dư VND, phân bổ phần dư theo thứ tự thành viên trong Plan. Hệ thống MUST tính số đã trả, phần chịu và chênh lệch; MUST NOT ghi nhận hoàn trả hoặc giao dịch tiền thật. | Đã làm rõ |
 | FR-024 | Hệ thống MUST lưu khoản chi theo từng bản ghi; một địa điểm Plan MAY có nhiều khoản chi. Bảng thành viên × địa điểm MUST là tổng hợp tiền đã thanh toán theo người trả, không phải dữ liệu nguồn thay cho khoản chi. | Đã làm rõ |
-| FR-025 | Hệ thống MUST hỗ trợ User đã đăng nhập đăng, sửa và xóa bài minigame của chính mình; bài mới MUST ở trạng thái chờ Admin duyệt và MUST NOT hiển thị với Guest trước khi được duyệt; Guest MUST được đọc bài đã công khai. Bài MUST chỉ chia sẻ thông tin và MUST NOT thực thi hoặc chơi minigame trực tuyến. | Core; quyền đăng/xem và duyệt trước khi công khai đã làm rõ |
-| FR-026 | Bài minigame MUST có tên và luật/hướng dẫn chơi; MAY có ảnh minh họa, mô tả, số người phù hợp, thời lượng, dụng cụ và thể loại thuộc danh mục thống nhất; từ khóa tự do là tùy chọn; tác giả và thời gian đăng MUST được ghi nhận. | Core; trường bắt buộc và trạng thái ban đầu đã làm rõ; hành vi duyệt khi sửa bài đã công khai cần chốt trước triển khai |
-| FR-027 | User MUST có thể tìm/lọc bài đã công khai theo số người chơi, thời lượng hoặc thể loại; thể loại MUST được chọn từ danh mục thống nhất và MAY có từ khóa tự do. User đã đăng nhập MUST có thể thích, bình luận, lưu yêu thích và báo cáo bài đã công khai; Admin MUST có thể duyệt bài chờ, xem báo cáo và giữ/ẩn/xóa bài vi phạm; hệ thống MUST gợi ý bài phù hợp số thành viên Plan mà không tự thêm bài hoặc tạo phiên chơi. | Core; nhóm chức năng và quy trình duyệt trước khi công khai đã xác nhận |
+| FR-025 | Hệ thống MUST hỗ trợ User đã đăng nhập đăng, sửa và xóa bài minigame của chính mình; bài mới MUST ở trạng thái chờ Admin duyệt và MUST NOT hiển thị với Guest trước khi được duyệt; sửa bài đã duyệt được công khai ngay, không cần duyệt lại; Guest MUST được đọc bài đã công khai. Bài MUST chỉ chia sẻ thông tin và MUST NOT thực thi hoặc chơi minigame trực tuyến. | Core; quyền đăng/xem, duyệt bài mới và sửa bài đã duyệt đã làm rõ |
+| FR-026 | Bài minigame MUST có tên và luật/hướng dẫn chơi; MAY có ảnh minh họa, mô tả, số người tối thiểu/tối đa (số nguyên), thời lượng (số phút nguyên), dụng cụ và thể loại thuộc danh mục thống nhất; từ khóa tự do là tùy chọn và được lưu tách biệt; tác giả và thời gian đăng MUST được ghi nhận. | Core; trường bắt buộc/tùy chọn, dạng số của bộ lọc và hành vi duyệt khi sửa bài đã làm rõ |
+| FR-027 | User MUST có thể tìm/lọc bài đã công khai theo số người chơi, thời lượng hoặc thể loại; thể loại MUST được chọn từ danh mục thống nhất và MAY có từ khóa tự do. User đã đăng nhập MUST có thể thích, bình luận, lưu yêu thích và báo cáo bài đã công khai; tác giả MUST có thể sửa/xóa bình luận của mình; mỗi User MUST chỉ có một báo cáo cho một bài và báo cáo MUST có lý do văn bản bắt buộc. Admin MUST có thể duyệt bài chờ, xem báo cáo và giữ/ẩn/xóa mềm bài vi phạm; hệ thống MUST gợi ý bài phù hợp số thành viên Plan mà không tự thêm bài hoặc tạo phiên chơi. | Core; nhóm chức năng, kiểm duyệt và vòng đời bình luận/báo cáo đã xác nhận |
 | FR-028 | Website MUST NOT cung cấp phòng minigame, chơi trực tuyến, xử lý lượt chơi hoặc giao dịch/hoàn trả tiền thật cho tính năng chia chi phí. | Out of Scope |
 | FR-029 | Hệ thống MUST từ chối xóa/rời thành viên Plan hoặc xóa địa điểm khi còn khoản chi tham chiếu; chủ Plan MUST xử lý các khoản chi liên quan trước. Hệ thống MUST NOT xóa khoản chi dây chuyền. | Đã làm rõ |
 | FR-030 | Admin MUST có thể tạo, xem, sửa và xóa mọi Plan và khoản chi; Plan do Admin tạo MUST thuộc sở hữu của Admin tạo Plan; mọi thao tác MUST tuân thủ các quy tắc toàn vẹn và xác nhận xóa đã nêu. Quyền này MUST NOT tự mở rộng sang quản lý tài khoản User hoặc nội dung khác. | Đã làm rõ |
@@ -623,7 +641,7 @@ duyệt, không phải danh sách bảng đã quyết định.
 | Phần chịu khoản chi | Số tiền mà một thành viên chịu trong một bản ghi chi phí. | Chia đều/tùy chỉnh, tính tổng và chênh lệch. | Mỗi dòng gắn một khoản chi và một thành viên; tổng phân bổ phải khớp chính xác số tiền khoản chi bằng VND. |
 | Địa điểm Plan | Nhóm khoản chi theo địa điểm để tạo bảng tổng hợp. | Tổng hợp thành viên × địa điểm. | Một địa điểm có thể có nhiều khoản chi; không thể xóa khi còn khoản chi tham chiếu và không xóa dữ liệu dây chuyền. |
 | Mục lịch trình | Hoạt động trong chuyến đi, được nhóm theo ngày của Plan. | PROP-005, FR-006 | Có tên, giờ bắt đầu/kết thúc, địa điểm, hướng dẫn và ghi chú; mặc định theo giờ bắt đầu, giờ trùng giữ thứ tự thêm; User có thể chọn chế độ sắp xếp thủ công. |
-| Bài đăng minigame | Nội dung cộng đồng chia sẻ minigame có thể chơi ngoài đời. | User đăng/sửa/xóa bài của mình; Guest đọc bài đã được Admin duyệt. | PROP-006, FR-025–028 | Có tác giả và thời điểm đăng; tên cùng luật/hướng dẫn chơi bắt buộc; ảnh, mô tả, thuộc tính minigame khác tùy chọn; bài mới chờ Admin duyệt; Admin xem báo cáo và giữ/ẩn/xóa bài vi phạm. Cách xử lý sửa bài đã công khai cần chốt trước triển khai. Không phải game session. |
+| Bài đăng minigame | Nội dung cộng đồng chia sẻ minigame có thể chơi ngoài đời. | User đăng/sửa/xóa bài của mình; Guest đọc bài đã được Admin duyệt. | PROP-006, FR-025–028 | Có tác giả và thời điểm đăng; tên cùng luật/hướng dẫn chơi bắt buộc; ảnh, mô tả, thuộc tính minigame khác tùy chọn; bài mới chờ Admin duyệt; sửa bài đã duyệt công khai ngay; Admin xem báo cáo và giữ/ẩn/xóa bài vi phạm. Không phải game session. |
 | Tương tác bài đăng | Like, comment, yêu thích và báo cáo. | Tương tác, lưu hoặc báo nội dung cộng đồng. | FR-027 | Core; trạng thái bài và báo cáo ảnh hưởng khả năng hiển thị; quyền sửa/xóa bình luận và quy tắc kiểm duyệt chi tiết cần thiết kế. |
 
 ### 6.3. Định hướng ERD và 3NF
@@ -775,7 +793,8 @@ review, không phải yêu cầu sửa Figma, source code hoặc database trong 
 - Kiểm thử validation cho dữ liệu thiếu/sai, ngày, số tiền, trùng lặp và xung
   đột cập nhật liên quan.
 - Kiểm thử xác thực: chưa đăng nhập, thông tin không hợp lệ, đăng nhập hợp lệ,
-  logout/token lifecycle sau khi chính sách được quyết định.
+  token hết hạn tối đa sau 7 ngày, logout thu hồi token hiện tại ở máy chủ,
+  cookie HttpOnly và các kiểm soát CSRF/cookie đã được rà soát.
 - Kiểm thử phân quyền: Guest, User sở hữu tài nguyên, User không sở hữu, Admin
   với từng quyền đã duyệt.
 - Kiểm thử toàn vẹn dữ liệu: liên kết chủ sở hữu, kế hoạch/khoản chi, xóa/cập
@@ -844,18 +863,18 @@ là quyết định có thể chốt trong Plan/thiết kế hoặc deliverable 
 | Q-013 / P2 | Cung cấp vị trí và phiên bản ERD/Figma sơ bộ nếu chúng tồn tại ngoài repository. | RESOLVED | ERD hiện có tại `docs/database/ERD.png` cùng `docs/database/database-note.md`; người dùng cung cấp liên kết Figma. Đã đọc ERD và quan sát Page 1/layer names cùng canvas overview; chưa kiểm tra đầy đủ từng frame ở kích thước đọc được. | Đã ghi nhận nguồn và giới hạn kiểm tra trong design review; kiểm tra frame chi tiết là công việc thiết kế tiếp theo, không phải câu hỏi nghiệp vụ. |
 | Q-014 / P2 | Chọn AWS services/topology và yêu cầu domain, HTTPS, backup/monitoring. | DEFERRED | Constitution chỉ xác nhận AWS là đích; không chọn dịch vụ hoặc topology. | Plan triển khai/vận hành. |
 | Q-015a / P3 | Xác định có yêu cầu xác minh email ngoài luồng khôi phục mật khẩu không. | DEFERRED | Chỉ các sự kiện email khôi phục, thêm thành viên và xóa Plan đã được xác nhận; xác minh email chưa được yêu cầu. | Chốt trước thiết kế/triển khai xác thực nếu cần; không mặc định bật. |
-| Q-015b / P3 | Chốt thời hạn, thu hồi và lưu trữ access token. | DEFERRED | Constitution xác nhận hướng access-token nhưng yêu cầu quyết định hành vi cụ thể trước triển khai. | Plan/thiết kế bảo mật và xác thực. |
+| Q-015b / P3 | Chốt thời hạn, thu hồi và lưu trữ access token. | RESOLVED | Người dùng xác nhận token hết hạn sau 7 ngày không sử dụng; đăng xuất thu hồi token hiện tại ở máy chủ; trình duyệt lưu token trong cookie HttpOnly. Người dùng duyệt Secure ở production, SameSite=Lax, CORS credentials giới hạn origin frontend, CSRF token và kiểm tra Origin/Referer cho request thay đổi dữ liệu. | Đã chốt trong Clarifications; kiểm chứng Shield cookie bridge và kiểm thử các kiểm soát trước khi phát hành. |
 | Q-016 / P1 | Chi phí cá nhân có thể tồn tại độc lập ngoài Plan không, hay mọi khoản chi phải thuộc một Plan cá nhân/nhóm? | RESOLVED | Người dùng xác nhận mọi khoản chi đều thuộc một Plan; chi phí cá nhân được ghi trong Plan riêng có thể chỉ gồm chủ sở hữu. Không có khoản chi độc lập ngoài Plan. | Đã chốt trong Clarifications; ERD/API/UI phải dùng Plan làm phạm vi khoản chi. |
 | Q-017a / P1 | Người thanh toán có bắt buộc là thành viên Plan không? | RESOLVED | Người dùng xác nhận người thanh toán trong Plan nhóm phải là thành viên hiện tại của Plan. | Đã chốt trong Clarifications; áp dụng kiểm tra membership cho dữ liệu khoản chi nhóm. |
-| Q-017b / P2 | Trong khoản chi, ngày, ghi chú và địa điểm trường nào bắt buộc? | DEFERRED | Các trường được nêu trong mô hình nghiệp vụ nhưng chưa xác định optionality; đây là chi tiết form/data dictionary. | Chốt trong Plan trước khi tạo form hoặc schema. |
+| Q-017b / P2 | Trong khoản chi, ngày, ghi chú và địa điểm trường nào bắt buộc? | RESOLVED | Người dùng xác nhận ngày bắt buộc; ghi chú và địa điểm tùy chọn. | Đã chốt trong Clarifications; ngày `NOT NULL`, ghi chú và địa điểm nullable. |
 | Q-018a / P1 | Những trường nào trong bài minigame bắt buộc để đăng? | RESOLVED | Người dùng xác nhận tên và luật/hướng dẫn chơi bắt buộc; mô tả, ảnh, số người chơi, thời lượng, dụng cụ và thể loại có thể để trống. | Đã chốt trong Clarifications; dùng để xác định validation và biểu mẫu đăng bài. |
 | Q-018b / P1 | Bài minigame được công khai ngay sau khi User đăng hay phải chờ Admin duyệt? | RESOLVED | Người dùng xác nhận bài mới phải chờ Admin duyệt trước khi công khai với Guest. Admin cũng xử lý báo cáo và có thể giữ, ẩn hoặc xóa bài vi phạm. | Đã chốt trong Clarifications; bài mới phải ở trạng thái chờ duyệt và không xuất hiện trong nội dung công khai. |
-| Q-018c / P2 | Khi tác giả sửa bài minigame đã được duyệt, bài có phải chờ Admin duyệt lại trước khi nội dung sửa được công khai không? | DEFERRED | Q-018b chốt duyệt trước khi công khai bài mới, nhưng không xác định chu kỳ duyệt cho nội dung sửa. | Chốt trong Plan trước khi triển khai sửa bài. |
-| Q-019 / P2 | Ai được sửa/xóa bình luận; báo cáo có lý do/trạng thái nào và Admin xử lý từng báo cáo ra sao? | DEFERRED | Like, comment, report và quyền Admin xem báo cáo/giữ, ẩn hoặc xóa bài đã xác nhận; chi tiết vòng đời comment/report chưa có tiêu chí chấp nhận. | Chốt trong Plan nghiệp vụ trước khi triển khai cộng đồng. |
-| Q-020 / P2 | Quy tắc gợi ý minigame theo số thành viên Plan cần xử lý thế nào khi số người phù hợp là một khoảng hoặc không có bài khớp? | DEFERRED | Chức năng gợi ý theo số thành viên đã xác nhận; ranking/empty-state cụ thể là hành vi UX có thể thiết kế sau khi chốt trường minigame. | Plan/thiết kế tính năng minigame. |
-| Q-021 / P2 | Chọn nhà cung cấp/API tìm kiếm điểm đến; xác định hoạt động khi thời gian bắt đầu/kết thúc bị bỏ trống và Plan cùng ngày. | DEFERRED | Đã chốt tìm kiếm bên ngoài, lưu metadata có sẵn, manual fallback và trường lịch trình; nhà cung cấp và optionality/ngày hợp lệ chưa chốt. | Plan/thiết kế tích hợp và validation; kiểm thử trước triển khai. |
-| Q-022 / P2 | Chốt danh sách thể loại seed và cách xử lý từ khóa tự do. | DEFERRED | Đã xác nhận dùng danh mục thống nhất và cho phép từ khóa tự do; nội dung danh mục có thể dựa trên khảo sát. | Plan/tasks nghiên cứu và thiết kế dữ liệu. |
-| Q-023 / P2 | Chốt nơi lưu audit log, thời hạn lưu và quyền đọc log. | DEFERRED | Đã xác nhận trường log và không ghi thao tác xem; chưa chọn giải pháp lưu trữ/vòng đời. | Plan vận hành/bảo mật. |
+| Q-018c / P2 | Khi tác giả sửa bài minigame đã được duyệt, bài có phải chờ Admin duyệt lại trước khi nội dung sửa được công khai không? | RESOLVED | Người dùng xác nhận nội dung sửa được công khai ngay, không cần duyệt lại. | Ghi nhận trong Clarifications và FR-025; không cần lưu bản sửa chờ duyệt riêng. |
+| Q-019 / P2 | Ai được sửa/xóa bình luận; báo cáo có lý do/trạng thái nào và Admin xử lý từng báo cáo ra sao? | RESOLVED | Tác giả sửa/xóa bình luận mình; một báo cáo/User/bài với lý do văn bản bắt buộc; Admin xử lý giữ nguyên/ẩn/xóa mềm bài và đóng báo cáo. | Ghi nhận trong Clarifications, User Story 6 và FR-027; bài xóa mềm để giữ liên kết báo cáo. |
+| Q-020 / P2 | Quy tắc gợi ý minigame theo số thành viên Plan cần xử lý thế nào khi số người phù hợp là một khoảng hoặc không có bài khớp? | DEFERRED | Schema đã chốt min/max số người và thời lượng phút dưới dạng số nguyên tùy chọn. Ranking và empty-state khi không có bài phù hợp là hành vi UX, không chặn thiết kế bảng. | Thiết kế UX/thuật toán gợi ý trước khi triển khai. |
+| Q-021 / P2 | Chọn nhà cung cấp/API tìm kiếm điểm đến. | DEFERRED | Đã chốt Plan một ngày được phép; giờ bắt đầu/kết thúc hoạt động có thể để trống độc lập, nếu cùng có thì giờ kết thúc phải sau giờ bắt đầu. Chỉ nhà cung cấp/API còn mở; dùng tham chiếu nhà cung cấp trung lập trong schema. | Chốt provider trước khi triển khai tích hợp tìm kiếm; các quy tắc ngày/giờ đã ghi trong FR-006. |
+| Q-022 / P2 | Chốt danh sách thể loại seed. | DEFERRED | Đã chốt danh mục thể loại chuẩn hóa và từ khóa tự do riêng; chỉ danh sách dữ liệu seed còn mở, không chặn schema. | Chốt danh sách seed sau khảo sát website tương tự. |
+| Q-023 / P2 | Chốt nơi lưu audit log, thời hạn lưu và quyền đọc log. | RESOLVED | Người dùng xác nhận lưu trong MySQL `travel_planner_db`, giữ không thời hạn; Admin và người vận hành hệ thống được đọc. Không thêm role nghiệp vụ; quyền người vận hành phải qua truy cập hệ thống giới hạn. | Đã ghi vào Clarifications và data model; áp dụng cho thiết kế bảng và chính sách truy cập, không ghi thao tác xem. |
 | Q-024 / P1 | Khi Admin tạo Plan, chủ sở hữu được gán là Admin hay một User khác? | RESOLVED | Người dùng xác nhận Admin trở thành chủ sở hữu của Plan do Admin tạo. | Đã chốt trong Clarifications; `owner_user_id` của Plan mới do Admin tạo tham chiếu Shield User của Admin đó; audit actor vẫn được ghi riêng cho thao tác cần nhật ký. |
 ## 13. Giả định và ràng buộc
 
@@ -879,7 +898,8 @@ là quyết định có thể chốt trong Plan/thiết kế hoặc deliverable 
   chưa được rà soát đầy đủ ở kích thước đọc được.
 - Công nghệ và kiến trúc tuân theo Constitution hiện hành; dịch vụ tìm kiếm điểm
   đến đã được xác định là bên ngoài, có phương án nhập thủ công khi lỗi; nhà
-  cung cấp/API, AWS services và access-token lifecycle chưa được chọn.
+  cung cấp/API và AWS services chưa được chọn. Q-015b đã chốt chính sách token;
+  chi tiết tích hợp cookie với Shield và CSRF còn là cổng thiết kế kỹ thuật.
 - Dữ liệu demo phải là giả lập; không cần nhập dữ liệu người dùng thực.
 - Đặc tả này không tạo schema vật lý, endpoint cụ thể, code, migration, hoặc
   thay đổi giao diện hiện có.
@@ -907,15 +927,13 @@ Các deliverable dưới đây cần được cập nhật theo đúng trạng t
 
 Specify đã ghi nhận các quyền và quy tắc cốt lõi đã xác nhận, bao gồm Plan
 riêng tư, khoản chi nhóm, cộng đồng minigame và Admin. Có thể bắt đầu
-`/speckit-plan` để lập phương án/đầu việc có điều kiện và khảo sát tài liệu;
-Q-018c và các quyết định DEFERRED cần được giải quyết ở giai đoạn ghi tại §12,
-trước khi khóa phần thiết kế hoặc triển khai tương ứng. Q-016 đã được xác nhận: mọi
-khoản chi thuộc Plan, kể cả Plan cá nhân chỉ có chủ sở hữu. Q-017a đã được xác
-nhận: người thanh toán khoản chi nhóm phải là thành viên Plan hiện tại. Q-018a
-đã được xác nhận: tên và luật/hướng dẫn chơi bắt buộc, các trường minigame còn
-lại tùy chọn. Q-018b đã được xác nhận: bài mới chờ Admin duyệt trước khi công
-khai. Q-024 đã được xác nhận: Admin là chủ sở hữu Plan do Admin tạo. Q-017b,
-Q-018c, Q-019–Q-023 có thể
-được phân rã thành quyết định ở Plan/thiết kế, không được tự biến thành yêu
-cầu đã duyệt. Chưa có cơ sở nói ERD, Figma hoặc tính năng nghiệp vụ đã hoàn
-thành.
+`/speckit-plan` để lập phương án/đầu việc có điều kiện và khảo sát tài liệu.
+Q-016, Q-017a, Q-017b, Q-018a, Q-018b, Q-018c, Q-019 và Q-024 đã được xác
+nhận. Các lựa chọn schema Minigame đã chốt gồm số người tối thiểu/tối đa,
+thời lượng phút, danh mục thể loại chuẩn hóa và từ khóa tách riêng. Q-020
+ranking/empty-state và Q-022 danh sách seed còn mở nhưng không chặn thiết kế
+bảng. Q-021 chỉ còn lựa chọn nhà cung cấp điểm đến; schema có thể dùng tham
+chiếu trung lập. Q-023 đã chốt lưu MySQL không thời hạn, Admin và người vận
+hành được đọc; không tạo role mới. Các lựa chọn còn lại cần được giải quyết ở
+giai đoạn tương ứng trước khi khóa phần thiết kế hoặc triển khai liên quan.
+Chưa có cơ sở nói ERD, Figma hoặc tính năng nghiệp vụ đã hoàn thành.

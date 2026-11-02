@@ -13,9 +13,11 @@ implements only `GET /api/health`.
 - Composer 2 and PHP compatible with `backend/composer.json` only if running
   backend tests on the host.
 
-Do not run schema migrations as part of this guide. The current
-`database/init.sql` only creates the `test_connection` connectivity table on a
-new MySQL volume; it is not the business schema.
+The current `database/init.sql` only creates the `test_connection` connectivity
+table on a new MySQL volume; it is not the business schema. CodeIgniter
+migrations create Shield authentication tables and the approved Plan,
+itinerary, expense/allocation, Minigame, and Admin audit schemas. Audit records
+are retained permanently in MySQL under the resolved Q-023 policy.
 
 ## Configure local environment
 
@@ -56,6 +58,29 @@ docker compose ps
 Wait for the `db` health check and PHP service. The current Compose mapping is
 API port `8001` and MySQL host port `3308`. Do not use `docker compose down -v`:
 removing the named volume destroys local database data.
+
+### Apply the current local schema
+
+Only run these commands against the local development database after verifying
+the active `backend/.env` target. They are not production deployment commands.
+The Shield migration must run before the application migration because business
+foreign keys reference Shield's `users.id`:
+
+```powershell
+docker compose exec -T php php spark migrate -n "CodeIgniter\Shield"
+docker compose exec -T php php spark migrate -n App
+```
+
+The application migrations create `plans`, `plan_members`, `plan_locations`,
+`itinerary_activities`, `expenses`, `expense_allocations`, and the Minigame
+genre, post, tag, interaction, comment, report, and Admin audit tables. The
+migrations use vendor-neutral destination fields; provider selection (Q-021),
+genre seed values (Q-022), and suggestion ranking (Q-020) do not block these
+table definitions. Q-023 is resolved: audit events are retained permanently,
+readable by Admins and system operators, and never capture read-only views.
+`database/init.sql` remains connectivity-only and unchanged. The local
+development database `travel_planner_db` has these migrations applied; the
+migration commands above are idempotent on an already-migrated database.
 
 Start the SPA in another PowerShell terminal:
 
@@ -124,6 +149,7 @@ them only after the relevant DEFERRED decisions are resolved. See the
 
 | Scenario | Expected validation evidence |
 |---|---|
+| Authentication token lifecycle | Token expires after 7 days without use; authenticated use renews the HttpOnly cookie; logout revokes only the current token server-side; production cookie is Secure and SameSite=Lax; credentialed CORS is limited to the configured frontend origin; state-changing requests require CSRF token and Origin/Referer validation. |
 | Guest access boundary | Guest can read only Admin-approved public minigame content; pending, hidden or deleted posts and private Plans reveal no private data. |
 | Plan ownership and lifecycle | User-created Plans are owned by that User; Admin-created Plans are owned by that Admin. Create, list, read, update and explicitly confirm deletion; only owner/member can access private Plan data, and Admin actions are auditable. |
 | Membership integrity | Directly add a registered User; reject duplicate membership; block removal while expense allocations reference that member. |
@@ -137,5 +163,5 @@ them only after the relevant DEFERRED decisions are resolved. See the
 | Responsive/accessibility | Exercise agreed viewports (375, 768 and 1280 px), keyboard flows, labels, focus, validation, empty/loading/error states and non-color-only status. |
 | Requirement traceability | Map each implemented FR/AC to a test and preserve synthetic-data evidence for coursework reporting. |
 
-No AWS deployment, migration, seed, destructive database cleanup or real
-payment operation is part of this quickstart.
+No AWS deployment, seed, destructive database cleanup or real payment
+operation is part of this quickstart.

@@ -2,9 +2,10 @@
 
 **Branch**: `main` | **Date**: 2026-11-02 | **Spec**: [spec.md](./spec.md)
 
-**Plan status**: Conditional design proposal. Nothing in this plan approves a new
-business rule, changes the existing ERD/Figma, creates a migration, or commits
-the AWS topology.
+**Plan status**: Conditional design proposal. The plan itself does not approve
+new business rules, change the existing ERD/Figma, or commit the AWS topology.
+The locally applied schema migrations were separately authorized by the
+Product Owner and are documented in [data-model.md](./data-model.md).
 
 ## Summary
 
@@ -19,9 +20,9 @@ The current ERD and proposed UI are reviewed in
 [design-review.md](./design-review.md); a conditional, conceptual data design
 is in [data-model.md](./data-model.md), API proposal in
 [contracts/api-contract.md](./contracts/api-contract.md), and validation guide
-in [quickstart.md](./quickstart.md). Five unresolved product decisions remain
-explicit gates; their options and affected layers are recorded in
-[research.md](./research.md) and [data-model.md](./data-model.md).
+in [quickstart.md](./quickstart.md). The P1 decisions Q-016, Q-017a, Q-018a,
+Q-018b and Q-024, and token policy Q-015b are resolved in the Spec. Remaining
+DEFERRED decisions stay gated at their relevant implementation steps.
 
 ## Technical Context
 
@@ -29,8 +30,9 @@ explicit gates; their options and affected layers are recorded in
 backend PHP `^8.2` (Composer), CodeIgniter 4.7, Shield 1.4.
 **Primary Dependencies**: Existing React/Vite and CodeIgniter/Shield packages;
 no additional framework or package is proposed.
-**Storage**: MySQL 8.4 in the existing Docker Compose development environment;
-business schema is not yet implemented.
+**Storage**: MySQL 8.4 in the existing Docker Compose development environment.
+Shield and all confirmed business tables, including permanent Admin audit
+events, are implemented locally through CodeIgniter migrations.
 **Testing**: Existing CodeIgniter PHPUnit setup (`composer test`), frontend
 Oxlint (`npm run lint`) and Vite production build (`npm run build`). Add
 feature-focused PHPUnit tests using existing test tooling; do not assume a
@@ -54,7 +56,7 @@ deployment decision.
 Guest / User / Admin browser
         |
         | React 19 + Vite SPA (JavaScript; built static assets)
-        | HTTPS JSON requests; Authorization: Bearer <Shield access token>
+        | HTTPS JSON requests; HttpOnly-cookie token (Shield bridge to verify)
         v
 REST API: /api
 CodeIgniter 4.7 (PHP 8.2+)
@@ -97,9 +99,14 @@ frontend/src/
 ```
 
 Use the existing API helper and Fetch API unless a concrete requirement
-justifies changing it. Keep tokens out of URLs and logs. A token storage
-mechanism and refresh/revocation UX require a security design decision; do not
-silently assume long-lived browser storage. Map loading, empty, validation,
+justifies changing it. Keep tokens out of URLs and logs. The approved policy is
+a Shield Access Token that expires after 7 days of inactivity, is stored in an
+HttpOnly cookie, and is revoked server-side on current-token logout; no refresh
+flow is approved. JavaScript must not read the token. Cookie controls are
+Secure in production and SameSite=Lax; credentialed CORS is restricted to the
+configured frontend origin, and state-changing requests require a CSRF token
+plus Origin/Referer validation. Verify cookie renewal and the cookie-to-Shield
+bridge before enabling protected browser requests. Map loading, empty, validation,
 permission, confirmation and network-error states to approved user journeys.
 The Figma `Page 1` layer inventory is now readable in the integrated browser;
 preserve the major layout, but verify individual frames at readable scale
@@ -120,7 +127,7 @@ backend/app/
 ├── Services/               # use cases, authorization coordination,
 │                           # transactional expense/minigame operations
 ├── Validation/             # reusable request rules when justified
-├── Database/Migrations/    # reviewed schema changes in a later phase
+├── Database/Migrations/    # applied staged schema and future reviewed changes
 └── Database/Seeds/         # synthetic test/demo data only
 backend/tests/
 ├── unit/
@@ -147,11 +154,14 @@ not current endpoints. Keep success/error payloads compatible with
 resource contents.
 
 MySQL stores the approved account references, Plans, membership, destinations,
-activities, expenses/allocations, minigame posts/interactions/reports and Admin
-audit events. Shield remains authoritative for credentials, account identity,
-authentication attempts/tokens and authorization group assignments; business
-tables reference Shield `users.id` and never copy credentials, tokens or
-identity secrets. Store derived totals as query results, not duplicated mutable
+activities, expenses/allocations, and minigame posts/interactions/reports.
+Admin audit events are stored permanently in MySQL; Admins and system operators
+may read them, with operator access restricted outside the business-role model.
+Shield remains authoritative for credentials, account identity, authentication
+attempts/tokens and authorization group assignments; business tables reference
+Shield `users.id` and never copy credentials, tokens or identity secrets.
+Business references restrict account deletion until a deletion workflow is
+approved. Store derived totals as query results, not duplicated mutable
 columns, unless later measured evidence justifies a documented exception. The
 conditional conceptual ERD and 3NF review are in `data-model.md`.
 
@@ -199,9 +209,11 @@ Current configuration evidence:
 
 - `Auth.php` registers Shield's `tokens` authenticator, but its
   `defaultAuthenticator` remains `session`.
-- `AuthToken.php` uses `Authorization` and sets an unused-token lifetime of one
-  year. Neither lifetime nor refresh/revocation/storage behavior is approved;
-  Q-015b remains deferred.
+- `AuthToken.php` currently uses the `Authorization` header and sets an
+  unused-token lifetime of one year. Q-015b now approves expiry after 7 days of
+  inactivity, server-side revocation of the current token on logout, and
+  HttpOnly-cookie storage. Verify sliding cookie renewal and implement a secure
+  cookie-to-authenticator bridge; do not assume Shield natively reads cookies.
 - `AuthGroups.php` sets new users' default group to `user`, defines `user` and
   `admin`, gives `user` no permissions and currently gives `admin` wildcard
   `*`. Guest is not a persisted Shield group. `Auth.php` has no registration or
@@ -237,11 +249,16 @@ ownership, and Admin-only actions; never infer that every User can mutate every
 resource or that Admin manages accounts. Guest access is anonymous/public-route
 policy, not a `guest` group or stored role. Do not add further roles.
 
-Use Shield's configured Access Token authenticator and its Authorization
-header for protected API requests. Route configuration must select and apply
-the token authenticator explicitly; do not rely on Shield's session default.
-Review lifetime, revocation, scopes, logout and browser storage before
-releasing protected features. Test each allowed/denied actor-resource pair.
+Use Shield's configured Access Token authenticator for protected API requests.
+Route configuration must select and apply the token authenticator explicitly;
+do not rely on Shield's session default. The current authenticator expects an
+Authorization header, while browser storage is approved as an HttpOnly cookie;
+use a verified secure bridge between them. Enforce the approved 7-day
+inactivity timeout and current-token server-side logout revocation. Use
+production Secure and SameSite=Lax cookies, credentialed CORS restricted to
+the configured frontend origin, and CSRF token plus Origin/Referer validation
+for state-changing requests. Do not invent refresh behavior or custom token
+scopes. Test each allowed/denied actor-resource pair.
 When a User or Admin creates a Plan, that creator is its owner. Admin CRUD
 actions are still attributed separately in the Admin audit event.
 
@@ -328,14 +345,18 @@ No option is selected in this plan.
 |---|---|---|
 | Q-016 | Every expense belongs to a Plan; personal expenses use a private Plan that may contain only its owner. | Require Plan scope for expense records; do not design standalone expenses. |
 | Q-017a | A group-Plan payer must be a current Plan member. | Validate payer membership against the Plan on every expense write. |
+| Q-017b | Expense date is required; note and Plan location are optional. | Require the date and keep note/location nullable in the schema and API. |
 | Q-018a | Minigame title and rules/instructions are required; the other listed fields may be omitted. | Apply only these required-field checks; keep optional fields nullable/optional. |
 | Q-018b | A new minigame post waits for Admin approval before Guest publication. | Model pending approval; exclude pending posts from public queries and provide an Admin approval queue. |
+| Q-018c | Author edits to an approved Minigame post are published immediately without re-approval. | Do not add a re-approval state for edits. |
+| Q-019 | Authors may edit/delete their comments; reports require a reason and are unique per User/post; Admin may keep, hide or soft-delete a reported post. | Preserve report references through soft deletion and constrain report lifecycle to the approved outcomes. |
+| Q-023 | Audit is stored permanently in MySQL and readable by Admins and system operators. | Keep operator access outside the business-role model; never create audit events for read-only access. |
 | Q-024 | A Plan creator owns the Plan, including an Admin who creates one. | Set owner from the authenticated creator; keep the Admin audit actor in the separate audit event, not a duplicate Plan creator column. |
 
-Remaining DEFERRED decisions (including Q-018c, Q-019–Q-023, Q-015a/b,
-Q-017b and Q-021) must be resolved at the stages listed in Spec §12. In
-particular, decide whether edits to an approved Minigame Post require
-re-approval before implementing that edit flow.
+Remaining DEFERRED decisions must be resolved at the stages listed in Spec §12.
+Q-015a (email verification), Q-020 (suggestion ranking/empty state), Q-021
+(destination provider selection), and Q-022 (genre seed values) remain open.
+They do not block the business tables already applied.
 
 Other risks: current ERD includes unapproved public sharing/subscriptions/booking
 and social interactions on Plans; its cost shape cannot enforce the confirmed
@@ -343,9 +364,12 @@ per-expense model. Figma layer names/canvas overview are readable, but
 individual frames have not been fully inspected and several labels suggest
 unapproved scope. AWS cost, availability and recovery cannot be estimated
 without topology and region.
-Shield's configured one-year unused token lifetime needs a security decision
-before production. The API currently exposes only health check, so all product
-contracts remain proposed.
+Shield's configured one-year unused-token lifetime does not match the approved
+7-day inactivity timeout and must be configured and tested. HttpOnly-cookie
+transport needs a verified bridge to Shield's Authorization-header
+authenticator; also verify cookie renewal and CSRF controls. The API currently
+exposes only health check, so all product contracts remain proposed except the
+approved Authentication contract.
 
 ## Constitution Check
 
@@ -355,8 +379,8 @@ contracts remain proposed.
 | II. Client-server | PASS — separate React client and REST API under `/api`. | PASS — no direct browser-to-MySQL access. |
 | III. MVC | PASS — CodeIgniter MVC with thin controllers and focused services/models. | PASS — no microservices or unnecessary repository abstraction. |
 | IV. REST/JSON | PASS — proposed resource API preserves existing response envelope. | CONDITIONAL — endpoint/schema details are proposal pending approval and Q gates. |
-| V. Data integrity/migrations | PASS — design targets 3NF, constraints and reproducible migrations. | CONDITIONAL — conceptual proposal only; no physical schema/migration is approved or run. |
-| VI. Authentication/authorization | PASS — Shield is the identity/auth foundation; only Guest/User/Admin are established. | CONDITIONAL — business references target Shield `users.id`; token filter wiring, least-privilege permissions and Q-015b token policy remain implementation/security gates; Plan ownership follows the resolved creator-is-owner rule. |
+| V. Data integrity/migrations | PASS — design targets 3NF, constraints and reproducible migrations. | CONDITIONAL — Shield and confirmed business tables, including Admin audit events, are applied locally through migrations; integrity behavior still needs feature tests. |
+| VI. Authentication/authorization | PASS — Shield is the identity/auth foundation; only Guest/User/Admin are established. | CONDITIONAL — business references target Shield `users.id`; token filter wiring, cookie-to-Shield transport, cookie renewal, CSRF controls, and least-privilege permissions remain implementation/security gates; the seven-day inactivity/HttpOnly/current-token-revocation policy and CSRF/CORS approach are resolved; Plan ownership follows the resolved creator-is-owner rule. |
 | VII. Security/privacy | PASS — server-side validation, access checks, safe errors/logging and protected secrets. | PASS — private Plan access and no real-money settlement preserved. |
 | VIII. UI/UX | PASS — UI tied to approved requirements, accessible states and responsive checks. | CONDITIONAL — Figma Page 1 inventory/canvas overview inspected, but individual full-size frames/interactions remain unverified; reconcile labels outside approved scope before implementation. |
 | IX. Validation/errors | PASS — explicit validation, status/error envelope and failure tests proposed. | PASS — duplicate expense warning is not converted into hard uniqueness. |
@@ -367,12 +391,11 @@ contracts remain proposed.
 | XIV. Spec-driven change | PASS — unresolved choices remain gates; proposals are labeled. | PASS — no new business decision is presented as approved. |
 
 **Overall gate**: Architecture and plan artifacts pass Constitution review.
-The previously unresolved P1 choices are integrated. Remaining DEFERRED
-decisions still gate their related implementation details; in particular,
-approved-post edit moderation (Q-018c), comment/report lifecycle (Q-019),
-destination/time rules (Q-021), genre catalog (Q-022), and audit retention
-(Q-023) must not be silently inferred. Proposed schema and API contracts remain
-design artifacts, not approved physical schema or implementation.
+The resolved P1 and schema questions are reflected in the applied tables.
+The remaining deferred choices gate only their related provider, suggestion,
+seed, or email-verification work. Product API behavior is not implemented
+merely because its schema exists. The original ERD remains unchanged pending
+its separate team review.
 
 ## Project Structure
 
@@ -401,7 +424,7 @@ backend/
 │   ├── Services/            # Proposed use cases / transaction coordination
 │   ├── Validation/          # Proposed reusable rules when useful
 │   └── Database/
-│       ├── Migrations/      # Later, reviewed schema changes only
+│       ├── Migrations/      # Applied staged schema plus future reviewed changes
 │       └── Seeds/           # Synthetic data only
 └── tests/                   # Existing PHPUnit setup; add focused tests
 frontend/

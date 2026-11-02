@@ -1,8 +1,9 @@
 # ERD and UI/UX Design Review
 
 **Review date**: 2026-11-02
-**Status**: Evidence-based review and conditional proposals only. No ERD, Figma,
-source code or database was changed.
+**Status**: Evidence-based review and conditional ERD/UI proposals. The supplied
+ERD, Figma and product source code remain unchanged. The local database schema
+was later created through approved migrations; see [data-model.md](./data-model.md).
 
 ## Evidence and access
 
@@ -39,9 +40,9 @@ confirmed product requirements.
 | Location Item | Stores actual cost and estimated cost per head. | Actual cost overlaps the missing Expense entity, obscuring which member paid each item. | Actual cost becomes an aggregate of expense rows; estimate is conditional. | **Required for actual cost** |
 | Route/itinerary | `ROUTE` groups location items but does not state a Plan-day date; distance/duration imply route optimization. | Cannot directly express the confirmed day-grouped itinerary, activity fields, or ordering behavior. | Add itinerary activity date, name, start/end, location, instructions, notes and ordering; exclude route optimization. | **Required** |
 | Destination | `PLAN.destination` is a free string; `LOCATION` has provider/cache fields. | Selected provider ID/name/address/coordinates cannot be consistently preserved in Plan. | Store selected destination source and provider metadata when present; support manual entry without provider ID. Do not select provider/caching policy here. | **Required**, provider details gated |
-| Minigame | `MINI_GAME` has no author, created time or publication/moderation state; tags cover equipment/setting, not genre. | Cannot enforce author edit/delete, Guest published reads, reports or Admin moderation. | Model a user-authored post, pending Admin-approval state and genre catalog; title and rules are required, listed remaining fields optional. Re-approval of edited published posts remains deferred (Q-018c). | **Required**, edit lifecycle deferred |
-| Community interactions | Like/save/comment relations are for `PLAN`; no minigame Like/Favorite/Comment/Report entities. | Confirmed minigame features have no data relationship or user uniqueness constraints. | Associate interactions/reports with minigame posts; leave comment/report lifecycle for a later decision. | **Required** |
-| Audit | No Admin audit entity. | Cannot prove required actor/time/action/target for Admin create/update/delete Plan/expense. | Add a minimal audit-event concept; retention/read permissions remain deferred. | **Required** |
+| Minigame | `MINI_GAME` has no author, created time or publication/moderation state; tags cover equipment/setting, not genre. | Cannot enforce author edit/delete, Guest published reads, reports or Admin moderation. | Model a user-authored post, pending Admin-approval state and genre catalog; title and rules are required, listed remaining fields optional. Approved-post edits publish immediately (Q-018c). Physical tables are in the local schema; the supplied ERD remains unchanged. | **Required** |
+| Community interactions | Like/save/comment relations are for `PLAN`; no minigame Like/Favorite/Comment/Report entities. | Confirmed minigame features have no data relationship or user uniqueness constraints. | Associate interactions/reports with minigame posts; apply the resolved comment/report lifecycle (Q-019). Physical tables are in the local schema; the supplied ERD remains unchanged. | **Required** |
+| Audit | The supplied ERD has no Admin audit entity. | Cannot prove required actor/time/action/target for Admin create/update/delete Plan/expense. | Add `admin_audit_events`; Q-023 resolves permanent MySQL storage and Admin/system-operator reads. The table exists locally; the supplied ERD remains unchanged. | **Required** |
 | Unapproved features | Subscription, public Plan, sharing/social Plans, location review, affiliate booking, route distance/time, general notification feed. | Increases schema and UI scope and implies commerce/public sharing not confirmed. | Exclude from MVP unless separately approved; do not delete/rewrite the supplied artifact in this review. | **Out of scope for this feature** |
 
 Detailed field, relationship and 3NF recommendations are in
@@ -68,8 +69,10 @@ Conditional branches:
 - Q-016 confirms every Expense references a Plan, including a private
   single-owner personal Plan; Q-017a requires a group-Plan payer to be a current
   member.
-- Q-018a/b confirm required minigame fields and Admin approval before public
-  visibility. Re-approval after edits remains deferred (Q-018c).
+- Q-018a/b/c confirm required minigame fields, Admin approval before public
+  visibility, and immediate publication of author edits to approved posts.
+- Q-019 confirms comment ownership and report reason/uniqueness/resolution rules.
+- Q-023 confirms permanent MySQL audit storage and Admin/system-operator reads.
 - Q-024 confirms that an Admin-created Plan is owned by that Admin.
 
 No cardinalities beyond already confirmed rules, physical field types, table
@@ -94,12 +97,12 @@ designed as final before those decisions are made.
 
 | User Story | Screen(s) needed | Main behavior/state coverage | Current status / gate |
 |---|---|---|---|
-| US1 — Auth | Registration, login, password recovery, protected-session expiry/error | Invalid fields, loading, wrong credentials, unauthenticated access, recovery request/success/failure | No clearly named login/register frame; only a consent text layer is visible. Token storage/lifecycle and email verification remain deferred. |
-| US2 — Plan | Plan list/search; create/edit; Plan detail; destination search/manual fallback; day-grouped itinerary editor; delete confirmation | Private list, no results, date errors, provider failure/manual entry, activity order mode, confirmation | Figma labels cover time/budget/type, Plan view/join/create/saved, location add, cost edit and delete confirmations. No explicit day-grouped itinerary frame identified by label. Destination provider and date/optional-time rules deferred. |
-| US3 — Expenses | Plan expense list; expense create/edit/detail; member × Plan-location aggregate; totals/category summary | One payer, equal/custom split, remainder, sum mismatch, possible-duplicate confirm, empty state, blocked member/location deletion | Actual/predicted cost-edit frames exist by label; no clearly identified payer/allocation/member × location summary frame. Apply the confirmed Plan scope and current-member payer rule. |
+| US1 — Auth | Registration, login, password recovery, protected-session expiry/error | Invalid fields, loading, wrong credentials, unauthenticated access, recovery request/success/failure | No clearly named login/register frame; only a consent text layer is visible. Token policy is resolved (7-day inactivity timeout, current-token revocation on logout, HttpOnly cookie); implementation must verify the Shield bridge and cookie renewal. Approved cookie controls: production Secure, SameSite=Lax, configured-origin credentialed CORS, and CSRF token plus Origin/Referer checks. Email verification remains deferred. |
+| US2 — Plan | Plan list/search; create/edit; Plan detail; destination search/manual fallback; day-grouped itinerary editor; delete confirmation | Private list, no results, date errors, provider failure/manual entry, activity order mode, confirmation | Figma labels cover time/budget/type, Plan view/join/create/saved, location add, cost edit and delete confirmations. No explicit day-grouped itinerary frame identified by label. Only destination-provider selection remains deferred; single-day and optional-time rules are confirmed. |
+| US3 — Expenses | Plan expense list; expense create/edit/detail; member × Plan-location aggregate; totals/category summary | One payer, equal/custom split, remainder, sum mismatch, possible-duplicate confirm, empty state, blocked member/location deletion | Actual/predicted cost-edit frames exist by label; no clearly identified payer/allocation/member × location summary frame. Every expense belongs to a Plan; the payer is a current member; date is required and note/location are optional. |
 | US4 — Search/summary/print | Authorized search/results; Plan summary; print preview/layout | Empty results, permission-filtered data, print-safe content, totals reconciliation | No screen. Search fields remain proposed; print content confirmed. |
 | US5 — Guest | Public landing and public minigame browse/detail | Accurate product description, login/register navigation, no private Plan leakage | Guest home and two Minigame layers are listed. Detailed visibility and interactions were not individually verified; Guest sees approved public posts only. |
-| US6 — Community minigame | Feed/search/filter; post detail/create/edit; like/favorite/comment/report; related suggestions | Optional post fields, invalid image/form, interaction states, report status, no matching suggestions, pending-approval feedback | Two Minigame layers exist by name, but post authoring, search/filter, interaction and report controls were not confirmed from full-size views. Title/rules are required; new posts wait for Admin approval. Comment/report details and re-approval after edits remain deferred. |
+| US6 — Community minigame | Feed/search/filter; post detail/create/edit; like/favorite/comment/report; related suggestions | Optional post fields, invalid image/form, interaction states, report status, no matching suggestions, pending-approval feedback | Two Minigame layers exist by name, but post authoring, search/filter, interaction and report controls were not confirmed from full-size views. Title/rules are required; new posts wait for Admin approval; author edits to approved posts publish immediately; comment/report rules are resolved. Suggestion ranking/empty-state remains deferred. |
 | US7 — Admin | Plan/expense list/detail/create/edit; pending-post approval; minigame reports/moderation queue/detail | CRUD confirmation, audit record status, approve/keep/hide/delete, hidden post not public, forbidden account-management actions | No Admin-specific frame label identified. An Admin-created Plan is owned by that Admin. |
 
 ## UI improvement recommendations (not applied)

@@ -13,8 +13,8 @@ preserve open product decisions without choosing answers for the product owner.
 | Backend | Composer requires PHP `^8.2`, CodeIgniter `^4.7`, Shield `^1.4`; PHPUnit 10.5 is configured. Application controllers include API health and a shared JSON response helper; business Models directory is empty. | `backend/composer.json`, `backend/app/Controllers/Api/`, `backend/app/Models/` |
 | API | Current route group is `/api`, with public `GET /api/health` and CORS. `BaseApiController` returns success `{status,message,data}` and error `{status,message,errors?}`. No business endpoints exist yet. | `backend/app/Config/Routes.php`, `backend/app/Controllers/Api/BaseApiController.php` |
 | Authentication | Composer lock pins Shield v1.4.1. The token authenticator and `Authorization` header are configured, but default auth is still `session` and no API route currently applies a Shield auth filter. Groups are `user` and `admin`; `admin` currently has wildcard permission, `user` has none. The Spec establishes only Guest/User/Admin and their approved product rules. | `backend/composer.lock`, `backend/app/Config/Auth.php`, `AuthToken.php`, `AuthGroups.php`, `Filters.php`, `Routes.php`; [spec.md](./spec.md) |
-| Token lifetime | The repository sets Shield `unusedTokenLifetime` to one year. This is a configuration fact, not an approved product/security lifetime. Refresh/revocation/browser storage policy remains to be reviewed before production. | `backend/app/Config/AuthToken.php`; Constitution Principle VI |
-| Database | Docker Compose uses `mysql:8.4`, exposes local DB port 3308, and mounts `database/init.sql`. The init script creates only `test_connection`; no business migrations/schema were found. | `compose.yaml`, `database/init.sql`, `backend/app/Database/` |
+| Token lifetime | The repository sets Shield `unusedTokenLifetime` to one year. The approved policy is expiry after 7 days without use, server-side revocation of the current token on logout, and HttpOnly-cookie storage. Shield implements an inactivity check using `last_used_at`; configure it to 7 days and verify cookie renewal. | `backend/app/Config/AuthToken.php`, locked Shield `AccessTokens.php`; Q-015b in `spec.md` |
+| Database | Docker Compose uses `mysql:8.4`, exposes local DB port 3308, and mounts `database/init.sql`. The init script still creates only `test_connection`. Applied CodeIgniter migrations create Shield authentication, Plan/membership/location, itinerary, expense/allocation, Minigame, and permanent Admin audit tables; business foreign keys restrict account deletion. The API/services are still unimplemented. | `compose.yaml`, `database/init.sql`, `backend/app/Database/Migrations/`, Shield migration |
 | Local development | Docker Compose runs PHP and MySQL. The React dev server is separate (`npm run dev`); it is not a Compose service. | `compose.yaml`, `frontend/package.json` |
 | Deployment | AWS is the approved target; no selected service, region, topology or production configuration is present. | Constitution Principles I/XIII; `compose.yaml` |
 
@@ -41,13 +41,16 @@ preserve open product decisions without choosing answers for the product owner.
 
 ### Shield 1.4 Access Tokens
 
-- **Decision**: Retain the configured Shield Access Token authenticator and the
-  `Authorization` header. Treat Shield `users.id` as the sole account
-  principal. Build resource authorization on the confirmed Guest/User/Admin
-  and Plan-owner/member rules, rather than treating token validity or a role
-  group as sufficient authorization.
+- **Decision**: Retain Shield Access Token authentication and use the approved
+  browser policy: expire after 7 days of inactivity, server-side revocation of the
+  current token on logout, and an HttpOnly cookie. Treat Shield `users.id` as
+  the sole account principal. Build resource authorization on the confirmed
+  Guest/User/Admin and Plan-owner/member rules, rather than treating token
+  validity or a role group as sufficient authorization.
 - **Rationale**: This is the Constitution's selected authentication foundation
-  and matches current configuration and locked package. Shield's migration
+  and matches the locked package and existing token authenticator. The approved
+  HttpOnly-cookie browser transport differs from Shield's configured header
+  transport and needs a custom, verified filter bridge. Shield's migration
   defines `users`, `auth_identities`, `auth_logins`, `auth_token_logins`,
   `auth_remember_tokens`, `auth_groups_users` and `auth_permissions_users`.
   Credential and token identity records belong to Shield; all business actor,
@@ -71,17 +74,28 @@ preserve open product decisions without choosing answers for the product owner.
   server-side resource checks; document an explicit Admin capability set before
   wiring routes.
 - **Current integration gap**: `Auth.php` registers `tokens`, but
-  `defaultAuthenticator` is `session`; `AuthToken.php` sets the
-  `Authorization` header, and the one-year unused-token lifetime is not
-  approved. `Auth.php` has no registration/login action configured, so email
+  `defaultAuthenticator` is `session`; `AuthToken.php` expects the
+  `Authorization` header and sets a one-year unused-token lifetime. The
+  installed `AccessTokens::check()` separately checks an explicit `expires`
+  timestamp and rejects tokens whose `last_used_at` is older than
+  `unusedTokenLifetime`; `generateAccessToken()` accepts an optional absolute
+  expiry. The approved behavior is the inactivity timeout, so configure
+  `unusedTokenLifetime` to 7 days and renew the browser cookie on authenticated
+  use. A custom filter must bridge the HttpOnly cookie to the Shield
+  authenticator; the package does not natively read cookies. Security controls
+  approved: production `Secure`, `SameSite=Lax`, credentialed CORS restricted to
+  the configured frontend origin, and CSRF token plus Origin/Referer checks on
+  state-changing requests. `Auth.php` has no registration/login action configured, so email
   verification is not configured and remains deferred. `Routes.php` currently
   exposes only `/api/health` under CORS, with no protected business route;
   `Filters.php` contains no explicit Shield filter alias. Protected API routes
   must explicitly select token auth during implementation, and Admin group
   provisioning needs a reviewed operational path.
-- **Not decided**: Token expiry policy, scopes, how the client stores a token,
-  refresh/revocation UX and whether email verification is required. Do not copy
-  the current one-year unused-token value into a product requirement.
+- **Still open/implementation-specific**: The exact custom filter and CSRF
+  token-bootstrap implementation, production frontend origin, and whether
+  custom token scopes are needed. Do not add a refresh flow or custom scopes
+  without approval. Email verification remains deferred under Q-015a. Do not
+  copy the current one-year unused-token value into the product requirement.
 - **Sources**: [locked Shield v1.4.1 migration](https://github.com/codeigniter4/shield/blob/93c5f1f1481ced93ceb4071ffa3a08a9647a7c8b/src/Database/Migrations/2020-12-28-223112_create_auth_tables.php),
   [Shield AuthGroups configuration](https://github.com/codeigniter4/shield/blob/93c5f1f1481ced93ceb4071ffa3a08a9647a7c8b/src/Config/AuthGroups.php),
   [Shield API Tokens guide](https://github.com/codeigniter4/shield/blob/v1.4.1/docs/guides/api_tokens.md).
@@ -174,9 +188,13 @@ are reflected in the Spec and design artifacts:
 | Q-017a payer membership | The payer in a group Plan must be a current Plan member. | Payer validation, membership relationship, expense form and tests. |
 | Q-018a required minigame fields | Title and rules/instructions are required; description, image, player count, duration, equipment and genre may be omitted. | Validation, create/edit form and data model. |
 | Q-018b publication | A newly submitted post waits for Admin approval before Guest publication. | Pending state, public-list filtering, Admin queue, user feedback and tests. |
+| Q-017b expense fields | Expense date is required; note and Plan location are optional. | Expense schema, validation and form. |
+| Q-018c approved-post editing | Author edits to an approved post are public immediately without re-approval. | Post update service and UI. |
+| Q-019 comments/reports | Authors may edit/delete their comments; one required-reason report per User/post; Admin may keep, hide or soft-delete the post. | Comment/report schemas, moderation and UI. |
 | Q-024 Admin-created Plan owner | The Admin who creates a Plan is its owner. | Owner reference, Admin create contract and separate audit actor attribution. |
+| Q-023 audit policy | Permanent MySQL audit records; Admin and system operators may read, with operator access restricted outside the application-role model. | `admin_audit_events` schema and later authorized write/read integration. |
 
-Q-018c (whether edits to an approved post require re-approval), Q-017b, Q-019
-through Q-023, Q-015a/b and the other items marked DEFERRED in Spec §12 remain
-for their stated design or implementation stages. They are not resolved by
-technical research and must not be inferred.
+Remaining DEFERRED items in Spec §12 (including email verification, suggestion
+ranking/empty-state, destination-provider selection, genre seed values, and AWS
+topology) remain for their stated design or implementation stages. They are not
+resolved by technical research and must not be inferred.
