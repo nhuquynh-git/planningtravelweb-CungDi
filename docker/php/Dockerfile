@@ -1,4 +1,3 @@
-
 FROM php:8.4-apache
 
 # Cài đặt thư viện hệ thống cần thiết
@@ -42,4 +41,13 @@ RUN printf '\n<Directory /var/www/html/public>\n\
 # Tắt cảnh báo ServerName
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
+# Script tự động migrate khi container khởi động
+# (sed xoá ký tự CRLF phòng khi file được checkout trên Windows)
+COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 80
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["apache2-foreground"]
