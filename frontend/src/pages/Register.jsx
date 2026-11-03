@@ -188,24 +188,15 @@ export default function Register() {
         setOtpError('');
         setIsOtpExpired(false);
 
-        try {
-            const result = await verifyOtp({
-                email,
-                otp,
-            });
+        const result = await verifyOtp({ email: email.trim(), otp: fullOtp });
+        setLoading(false);
 
-            if (result?.success) {
-                setStep("success");
-            } else {
-                setError(result?.message || "Xác minh OTP thất bại");
-            }
-        } catch (err) {
-            setLoading(false);
-            const msg = err.message || 'Mã xác nhận không đúng. Vui lòng kiểm tra lại.';
+        if (result.success) {
+            setStep('success');
+        } else {
+            const msg = result.message || 'Mã xác nhận không đúng. Vui lòng kiểm tra lại.';
             setOtpError(msg);
-            if (msg.includes('hết hạn')) {
-                setIsOtpExpired(true);
-            }
+            if (msg.includes('hết hạn')) setIsOtpExpired(true);
         }
     };
 

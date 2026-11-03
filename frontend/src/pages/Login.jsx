@@ -42,7 +42,8 @@ export default function Login() {
             fetchCurrentUser().then((res) => {
                 setLoading(false);
                 if (res.success) {
-                    navigate(from, { replace: true });
+                    // Lần đầu đăng nhập Google/Facebook -> bắt đặt mật khẩu
+                    navigate(res.user?.needs_password_setup ? '/set-password' : from, { replace: true });
                 } else {
                     setOauthError('Lấy thông tin tài khoản thất bại sau khi đăng nhập');
                 }

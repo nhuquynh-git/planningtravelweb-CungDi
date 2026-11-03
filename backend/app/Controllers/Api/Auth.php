@@ -189,6 +189,70 @@ class Auth extends BaseApiController
         }
     }
 
+    /**
+     * POST /api/auth/forgot-password  { email }
+     */
+    public function forgotPassword(): ResponseInterface
+    {
+        try {
+            $data   = $this->request->getJSON(true) ?? [];
+            $result = $this->authService->forgotPassword((string) ($data['email'] ?? ''));
+
+            return $this->success(['otp_preview' => $result['otp_preview']], $result['message']);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            log_message('error', 'Auth forgotPassword error: ' . $e->getMessage());
+            return $this->error('Không thể xử lý yêu cầu. Vui lòng thử lại sau.', 500);
+        }
+    }
+
+    /**
+     * POST /api/auth/reset-password  { email, otp, password }
+     */
+    public function resetPassword(): ResponseInterface
+    {
+        try {
+            $data   = $this->request->getJSON(true) ?? [];
+            $result = $this->authService->resetPassword(
+                (string) ($data['email'] ?? ''),
+                (string) ($data['otp'] ?? ''),
+                (string) ($data['password'] ?? '')
+            );
+
+            return $this->success(null, $result['message']);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            log_message('error', 'Auth resetPassword error: ' . $e->getMessage());
+            return $this->error('Đặt lại mật khẩu thất bại', 500);
+        }
+    }
+
+    /**
+     * POST /api/auth/set-password  { password }  (cần đăng nhập)
+     * Đặt mật khẩu lần đầu cho tài khoản tạo qua Google/Facebook.
+     */
+    public function setPassword(): ResponseInterface
+    {
+        try {
+            $currentUser = $this->authService->getCurrentUser();
+            if ($currentUser === null) {
+                return $this->error('Vui lòng đăng nhập', 401);
+            }
+
+            $data = $this->request->getJSON(true) ?? [];
+            $this->authService->setInitialPassword((int) $currentUser['id'], (string) ($data['password'] ?? ''));
+
+            return $this->success(null, 'Đã thiết lập mật khẩu thành công');
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            log_message('error', 'Auth setPassword error: ' . $e->getMessage());
+            return $this->error('Thiết lập mật khẩu thất bại', 500);
+        }
+    }
+
     public function options()
     {
         return $this->response->setStatusCode(204);

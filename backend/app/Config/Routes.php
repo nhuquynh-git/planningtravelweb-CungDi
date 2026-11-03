@@ -8,6 +8,8 @@ $routes->get('/', 'Home::index');
 // Public Routes
 $routes->get('/login', 'Home::index');
 $routes->get('/register', 'Home::index');
+$routes->get('/forgot-password', 'Home::index');
+$routes->get('/set-password', 'Home::index');
 
 // API Routes
 $routes->group('api', ['filter' => 'cors'], function ($routes) {
@@ -23,14 +25,16 @@ $routes->group('api', ['filter' => 'cors'], function ($routes) {
         $routes->post('login', 'Api\Auth::login');
         $routes->post('logout', 'Api\Auth::logout');
 
+        // Quên mật khẩu (MỚI)
+        $routes->post('forgot-password', 'Api\Auth::forgotPassword');
+        $routes->post('reset-password', 'Api\Auth::resetPassword');
+
         // OAuth Routes - Google & Facebook
         $routes->get('oauth/google', 'Api\Auth::oauthGoogle');
         $routes->get('oauth/google/callback', 'Api\Auth::oauthGoogleCallback');
-        $routes->post('oauth/google/verify', 'Api\Auth::oauthGoogleVerify');
 
         $routes->get('oauth/facebook', 'Api\Auth::oauthFacebook');
         $routes->get('oauth/facebook/callback', 'Api\Auth::oauthFacebookCallback');
-        $routes->post('oauth/facebook/verify', 'Api\Auth::oauthFacebookVerify');
 
         $routes->options('(:any)', 'Api\Auth::options');
     });
@@ -39,7 +43,7 @@ $routes->group('api', ['filter' => 'cors'], function ($routes) {
     $routes->group('', ['filter' => 'token'], function ($routes) {
         $routes->get('auth/me', 'Api\Auth::me');
         $routes->put('auth/profile', 'Api\Auth::profile');
-        $routes->post('auth/refresh', 'Api\Auth::refresh');
+        $routes->post('auth/set-password', 'Api\Auth::setPassword'); // MỚI
     });
 
     // CORS Preflight

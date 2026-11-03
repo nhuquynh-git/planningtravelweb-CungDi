@@ -2,36 +2,34 @@
 
 namespace App\Services;
 
-use CodeIgniter\Shield\Entities\User;
-use CodeIgniter\Shield\Models\UserModel;
-use CodeIgniter\Shield\Models\UserIdentityModel;
 use App\Models\UserProfileModel;
+use CodeIgniter\Shield\Entities\User;
 
 /**
  * Authentication Service
- * 
- * Handles user registration with 6-digit email OTP verification,
- * login via email or username, logout, and token management.
+ *
+ * - Đăng ký: lưu đăng ký TẠM + gửi OTP; chỉ tạo user thật sau khi OTP đúng.
+ * - Đăng nhập email/username, đăng xuất, token.
+ * - Quên mật khẩu (OTP) / đặt lại mật khẩu.
+ * - Đặt mật khẩu lần đầu cho tài khoản Google/Facebook.
  */
 class AuthService
 {
     protected $userProvider;
     protected $identityProvider;
     protected $auth;
+    protected OtpService $otp;
 
     public function __construct()
     {
-        $this->userProvider = model(\CodeIgniter\Shield\Models\UserModel::class);
+        $this->userProvider     = model(\CodeIgniter\Shield\Models\UserModel::class);
         $this->identityProvider = model(\CodeIgniter\Shield\Models\UserIdentityModel::class);
-        $this->auth = auth('tokens');
+        $this->auth             = auth('tokens');
+        $this->otp              = new OtpService();
     }
 
-    /**
-     * Register a new user and generate 6-digit OTP for email verification
-     * 
-     * @param array $data email, username, password
-     * @return array
-     */
+    // ==================== Đăng ký + OTP ====================
+
     public function register(array $data): array
     {
         $rules = [
@@ -50,193 +48,88 @@ class AuthService
             ],
             'email' => [
                 'valid_email' => 'Địa chỉ email không hợp lệ',
-            ]
+            ],
         ];
 
         $validation = service('validation');
         $validation->setRules($rules, $messages);
 
-        if (!$validation->run($data)) {
+        if (! $validation->run($data)) {
             throw new \RuntimeException(implode(', ', $validation->getErrors()));
         }
 
-        $email = strtolower(trim($data['email']));
+        $email    = strtolower(trim($data['email']));
         $username = trim($data['username']);
 
-        // Check if email already exists
-        $existingEmail = $this->identityProvider
-            ->where('type', 'email_password')
-            ->where('secret', $email)
-            ->first();
-
-        if ($existingEmail !== null) {
-            // Check if user is active
-            $user = $this->userProvider->findById($existingEmail->user_id);
-            if ($user !== null && !$user->isActivated()) {
-                // If account exists but not activated, regenerate OTP and allow verifying
-                $otp = $this->generateAndSendOtp($user, $email);
-                return [
-                    'status'       => 'need_verification',
-                    'email'        => $email,
-                    'username'     => $user->username,
-                    'message'      => 'Tài khoản chưa được kích hoạt. Mã OTP mới đã được gửi tới email của bạn.',
-                    'otp_preview'  => (ENVIRONMENT !== 'production') ? $otp : null,
-                ];
-            }
+        if ($this->emailExists($email)) {
             throw new \RuntimeException('Địa chỉ email này đã được sử dụng');
         }
-
-        // Check if username already exists
-        $existingUsername = $this->userProvider
-            ->where('username', $username)
-            ->first();
-
-        if ($existingUsername !== null) {
+        if ($this->usernameExists($username)) {
             throw new \RuntimeException('Tên tài khoản này đã được sử dụng');
         }
 
-        // Create inactive user
-        $user = new User([
-            'email'    => $email,
-            'username' => $username,
-            'password' => $data['password'],
-            'active'   => 0, // Inactive until OTP is verified
+        // KHÔNG tạo user ở bước này. Chỉ lưu tạm (mật khẩu đã băm) cùng OTP.
+        $otp = $this->otp->issue($email, OtpService::PURPOSE_REGISTER, [
+            'username'      => $username,
+            'password_hash' => service('passwords')->hash($data['password']),
         ]);
 
-        $this->userProvider->save($user);
-
-        $userId = $this->userProvider->getInsertID();
-        $user = $this->userProvider->findById($userId);
-
-        if ($user === null) {
-            throw new \RuntimeException('Không thể tạo tài khoản');
-        }
-
-        // Add to default 'user' group
-        $user->addGroup('user');
-
-        // Generate and send 6-digit OTP
-        $otp = $this->generateAndSendOtp($user, $email);
-
         return [
-            'status'       => 'need_verification',
-            'email'        => $email,
-            'username'     => $username,
-            'message'      => 'Mã xác nhận 6 số đã được gửi tới email của bạn',
-            'otp_preview'  => (ENVIRONMENT !== 'production') ? $otp : null,
+            'status'      => 'need_verification',
+            'email'       => $email,
+            'username'    => $username,
+            'message'     => 'Mã xác nhận 6 số đã được gửi tới email của bạn',
+            'otp_preview' => (ENVIRONMENT !== 'production') ? $otp : null,
         ];
     }
 
     /**
-     * Generate 6-digit OTP, store in database and send email
-     */
-    public function generateAndSendOtp(User $user, string $email): string
-    {
-        $otp = (string) random_int(100000, 999999);
-        $expires = date('Y-m-d H:i:s', time() + 300); // 5 minutes lifetime
-
-        // Delete any existing OTP for this user
-        $this->identityProvider
-            ->where('user_id', $user->id)
-            ->where('type', 'email_otp')
-            ->delete();
-
-        // Save new OTP
-        $this->identityProvider->insert([
-            'user_id' => $user->id,
-            'type'    => 'email_otp',
-            'secret'  => $otp,
-            'name'    => 'Email Verification OTP',
-            'expires' => $expires,
-        ]);
-
-        // Attempt to send email
-        $this->sendOtpEmail($email, $otp);
-
-        return $otp;
-    }
-
-    /**
-     * Send OTP email via CodeIgniter Email service
-     */
-    protected function sendOtpEmail(string $email, string $otp): void
-    {
-        try {
-            $emailService = service('email');
-            $emailService->setTo($email);
-            $emailService->setSubject('Mã xác thực tài khoản Cùng Đi Travel Planner: ' . $otp);
-            $emailService->setMessage(
-                "Xin chào,\n\n" .
-                "Mã xác thực của bạn trên Cùng Đi Travel Planner là: $otp\n" .
-                "Mã này có hiệu lực trong 5 phút.\n\n" .
-                "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email."
-            );
-            if (! $emailService->send(false)) {
-                log_message('error', 'Send OTP mail failed: ' . $emailService->printDebugger(['headers']));
-            }
-        } catch (\Throwable $e) {
-            log_message('error', 'Error sending OTP email: ' . $e->getMessage());
-        }
-
-        // Log OTP in writable/logs for convenient local testing
-        log_message('info', ">>> OTP for [$email]: $otp (Valid for 5 mins) <<<");
-    }
-
-    /**
-     * Verify 6-digit OTP and activate user account
+     * Xác minh OTP -> tạo tài khoản thật (đã kích hoạt) -> đăng nhập luôn.
      */
     public function verifyOtp(string $email, string $otp): array
     {
         $email = strtolower(trim($email));
-        $otp = trim($otp);
+        $otp   = trim($otp);
 
-        if (empty($email) || empty($otp)) {
+        if ($email === '' || $otp === '') {
             throw new \RuntimeException('Vui lòng nhập đầy đủ email và mã xác nhận');
         }
 
-        // Find email identity
-        $identityEmail = $this->identityProvider
-            ->where('type', 'email_password')
-            ->where('secret', $email)
-            ->first();
+        $payload = $this->otp->verify($email, OtpService::PURPOSE_REGISTER, $otp);
 
-        if ($identityEmail === null) {
-            throw new \RuntimeException('Không tìm thấy tài khoản với email này');
+        if (empty($payload['username']) || empty($payload['password_hash'])) {
+            throw new \RuntimeException('Dữ liệu đăng ký không hợp lệ. Vui lòng đăng ký lại.');
         }
 
-        $user = $this->userProvider->findById($identityEmail->user_id);
-        if ($user === null) {
-            throw new \RuntimeException('Tài khoản không tồn tại');
+        // Kiểm tra lại phòng trường hợp trong 5 phút có người khác lấy mất
+        if ($this->emailExists($email)) {
+            throw new \RuntimeException('Địa chỉ email này đã được sử dụng');
+        }
+        if ($this->usernameExists($payload['username'])) {
+            throw new \RuntimeException('Tên tài khoản này vừa được người khác sử dụng. Vui lòng đăng ký lại với tên khác.');
         }
 
-        // Find OTP identity
-        $identityOtp = $this->identityProvider
-            ->where('user_id', $user->id)
-            ->where('type', 'email_otp')
-            ->orderBy('id', 'DESC')
-            ->first();
-
-        if ($identityOtp === null) {
-            throw new \RuntimeException('Mã xác nhận không tồn tại hoặc đã được sử dụng. Vui lòng gửi lại mã.');
-        }
-
-        // Check expiration
-        if (!empty($identityOtp->expires) && strtotime($identityOtp->expires) < time()) {
-            throw new \RuntimeException('Mã xác nhận đã hết hạn. Vui lòng bấm Gửi lại mã.');
-        }
-
-        // Check if OTP matches
-        if ($identityOtp->secret !== $otp) {
-            throw new \RuntimeException('Mã xác nhận không đúng. Vui lòng kiểm tra lại.');
-        }
-
-        // OTP is valid! Activate user and delete OTP
-        $this->identityProvider->where('id', $identityOtp->id)->delete();
-
-        $user->active = 1;
+        $user = new User([
+            'email'    => $email,
+            'username' => $payload['username'],
+            'password' => bin2hex(random_bytes(16)), // tạm, ghi đè bằng hash đã lưu ngay bên dưới
+            'active'   => 1,
+        ]);
         $this->userProvider->save($user);
 
-        // Generate access token for automatic login
+        $user = $this->userProvider->findById($this->userProvider->getInsertID());
+        if ($user === null) {
+            throw new \RuntimeException('Không thể tạo tài khoản');
+        }
+
+        // Dùng đúng mật khẩu người dùng đã nhập lúc đăng ký
+        db_connect()->table('auth_identities')
+            ->where(['user_id' => $user->id, 'type' => 'email_password'])
+            ->update(['secret2' => $payload['password_hash']]);
+
+        $user->addGroup('user');
+        $this->markPasswordSet($user->id, true);
+
         $token = $this->generateToken($user, 7 * 86400);
 
         return [
@@ -245,28 +138,9 @@ class AuthService
         ];
     }
 
-    /**
-     * Resend OTP to email
-     */
     public function resendOtp(string $email): array
     {
-        $email = strtolower(trim($email));
-
-        $identityEmail = $this->identityProvider
-            ->where('type', 'email_password')
-            ->where('secret', $email)
-            ->first();
-
-        if ($identityEmail === null) {
-            throw new \RuntimeException('Không tìm thấy tài khoản với email này');
-        }
-
-        $user = $this->userProvider->findById($identityEmail->user_id);
-        if ($user === null) {
-            throw new \RuntimeException('Tài khoản không tồn tại');
-        }
-
-        $otp = $this->generateAndSendOtp($user, $email);
+        $otp = $this->otp->resend($email, OtpService::PURPOSE_REGISTER);
 
         return [
             'success'     => true,
@@ -275,74 +149,58 @@ class AuthService
         ];
     }
 
-    /**
-     * Login user with Email OR Username + Password
-     * 
-     * @param array $credentials login (or email), password, remember_me
-     * @return array User data and access token
-     */
+    // ==================== Đăng nhập / đăng xuất ====================
+
     public function login(array $credentials): array
     {
         $loginInput = trim($credentials['login'] ?? $credentials['email'] ?? $credentials['username'] ?? '');
-        $password = $credentials['password'] ?? '';
-        $remember = !empty($credentials['remember_me'] ?? $credentials['remember'] ?? false);
+        $password   = $credentials['password'] ?? '';
+        $remember   = ! empty($credentials['remember_me'] ?? $credentials['remember'] ?? false);
 
-        if (empty($loginInput)) {
+        if ($loginInput === '') {
             throw new \RuntimeException('Vui lòng nhập email hoặc tên tài khoản');
         }
-        if (empty($password)) {
+        if ($password === '') {
             throw new \RuntimeException('Vui lòng nhập mật khẩu');
         }
 
         $user = null;
 
-        // Check if login input is an email
         if (filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
-            $existingEmail = $this->identityProvider
-                ->where('type', 'email_password')
-                ->where('secret', strtolower($loginInput))
-                ->first();
-
-            if ($existingEmail !== null) {
-                $user = $this->userProvider->findById($existingEmail->user_id);
-            }
+            $user = $this->findUserByEmail(strtolower($loginInput));
         } else {
-            // Otherwise, search by username
-            $user = $this->userProvider
-                ->where('username', $loginInput)
-                ->first();
+            $user = $this->userProvider->where('username', $loginInput)->first();
         }
 
         if ($user === null) {
             throw new \RuntimeException('Tên tài khoản hoặc mật khẩu không chính xác');
         }
 
-        // Verify password
-        $emailIdentity = $user->getEmailIdentity();
-        if ($emailIdentity === null || empty($emailIdentity->secret2)) {
-            throw new \RuntimeException('Tài khoản này chưa thiết lập mật khẩu (có thể đăng ký qua Google/Facebook)');
+        // Tài khoản Google/Facebook chưa đặt mật khẩu lần đầu
+        if ($this->needsPasswordSetup($user->id)) {
+            throw new \RuntimeException(
+                'Tài khoản này được tạo qua Google/Facebook. Hãy đăng nhập bằng Google/Facebook, hoặc dùng "Quên mật khẩu" để tạo mật khẩu.'
+            );
         }
 
-        $passwords = service('passwords');
-        if (!$passwords->verify($password, $emailIdentity->secret2)) {
+        $emailIdentity = $user->getEmailIdentity();
+        if ($emailIdentity === null || empty($emailIdentity->secret2)) {
             throw new \RuntimeException('Tên tài khoản hoặc mật khẩu không chính xác');
         }
 
-        // Check if user is activated (completed OTP verification)
-        if (!$user->isActivated()) {
-            $otp = $this->generateAndSendOtp($user, $user->email);
-            return [
-                'status'       => 'need_verification',
-                'email'        => $user->email,
-                'username'     => $user->username,
-                'message'      => 'Tài khoản chưa được kích hoạt email. Vui lòng nhập mã OTP để tiếp tục.',
-                'otp_preview'  => (ENVIRONMENT !== 'production') ? $otp : null,
-            ];
+        if (! service('passwords')->verify($password, $emailIdentity->secret2)) {
+            throw new \RuntimeException('Tên tài khoản hoặc mật khẩu không chính xác');
         }
 
-        // Lifetime: 30 days if remember_me, otherwise 7 days
+        // Chặn hẳn tài khoản chưa kích hoạt (dữ liệu cũ từ luồng đăng ký trước đây)
+        if (! $user->isActivated()) {
+            throw new \RuntimeException(
+                'Tài khoản chưa được xác minh email. Hãy dùng "Quên mật khẩu" để xác minh qua email, hoặc đăng ký lại.'
+            );
+        }
+
         $lifetime = $remember ? (30 * 86400) : (7 * 86400);
-        $token = $this->generateToken($user, $lifetime);
+        $token    = $this->generateToken($user, $lifetime);
 
         return [
             'status' => 'success',
@@ -351,9 +209,6 @@ class AuthService
         ];
     }
 
-    /**
-     * Logout user and revoke current token
-     */
     public function logout(?string $token = null): bool
     {
         if ($token) {
@@ -366,9 +221,6 @@ class AuthService
         return true;
     }
 
-    /**
-     * Get current authenticated user
-     */
     public function getCurrentUser(): ?array
     {
         if (! $this->auth->loggedIn()) {
@@ -383,9 +235,6 @@ class AuthService
         return $this->formatUser($user);
     }
 
-    /**
-     * Validate access token and return user
-     */
     public function validateToken(string $token): ?User
     {
         $identity = $this->identityProvider->where('type', 'access_token')
@@ -396,14 +245,13 @@ class AuthService
             return null;
         }
 
-        // Check expiration
-        if (!empty($identity->expires) && strtotime($identity->expires) < time()) {
+        if (! empty($identity->expires) && strtotime($identity->expires) < time()) {
             $this->identityProvider->where('id', $identity->id)->delete();
             return null;
         }
 
         $user = $this->userProvider->findById($identity->user_id);
-        if ($user === null || !$user->isActivated()) {
+        if ($user === null || ! $user->isActivated()) {
             return null;
         }
 
@@ -411,9 +259,154 @@ class AuthService
         return $user;
     }
 
+    // ==================== Quên mật khẩu ====================
+
     /**
-     * Generate a new access token for user
+     * Luôn trả cùng một thông báo để không lộ email nào đã đăng ký.
      */
+    public function forgotPassword(string $email): array
+    {
+        $email = strtolower(trim($email));
+
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Địa chỉ email không hợp lệ');
+        }
+
+        $result = [
+            'message'     => 'Nếu email tồn tại trong hệ thống, mã xác nhận đã được gửi tới hộp thư của bạn.',
+            'otp_preview' => null,
+        ];
+
+        // Email giả của Facebook (không có email thật) thì không gửi được
+        if (str_ends_with($email, '@facebook.local') || ! $this->emailExists($email)) {
+            return $result;
+        }
+
+        try {
+            $otp = $this->otp->issue($email, OtpService::PURPOSE_RESET);
+            if (ENVIRONMENT !== 'production') {
+                $result['otp_preview'] = $otp;
+            }
+        } catch (\RuntimeException $e) {
+            // Đang trong thời gian chờ gửi lại: vẫn trả thông báo chung
+            log_message('info', 'forgotPassword: ' . $e->getMessage());
+        }
+
+        return $result;
+    }
+
+    public function resetPassword(string $email, string $otp, string $newPassword): array
+    {
+        $email = strtolower(trim($email));
+
+        // Kiểm tra mật khẩu TRƯỚC để không đốt OTP khi mật khẩu không hợp lệ
+        $this->assertValidPassword($newPassword);
+
+        $this->otp->verify($email, OtpService::PURPOSE_RESET, $otp);
+
+        $user = $this->findUserByEmail($email);
+        if ($user === null) {
+            throw new \RuntimeException('Không tìm thấy tài khoản với email này');
+        }
+
+        $user->password = $newPassword;
+        $user->active   = 1; // đã chứng minh sở hữu email qua OTP
+        $this->userProvider->save($user);
+
+        $this->markPasswordSet($user->id, true);
+
+        // Đăng xuất mọi thiết bị
+        $user->revokeAllAccessTokens();
+
+        return ['message' => 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.'];
+    }
+
+    // ==================== Mật khẩu lần đầu (Google/Facebook) ====================
+
+    public function setInitialPassword(int $userId, string $password): void
+    {
+        $this->assertValidPassword($password);
+
+        if (! $this->needsPasswordSetup($userId)) {
+            throw new \RuntimeException('Tài khoản đã có mật khẩu. Hãy dùng "Quên mật khẩu" nếu muốn đổi.');
+        }
+
+        $user = $this->userProvider->findById($userId);
+        if ($user === null) {
+            throw new \RuntimeException('Không tìm thấy người dùng');
+        }
+
+        $user->password = $password;
+        $this->userProvider->save($user);
+
+        $this->markPasswordSet($userId, true);
+    }
+
+    public function needsPasswordSetup(int $userId): bool
+    {
+        $row = db_connect()->table('user_profiles')
+            ->select('password_set')
+            ->where('user_id', $userId)
+            ->get()->getRowArray();
+
+        return $row !== null && (int) $row['password_set'] === 0;
+    }
+
+    public function markPasswordSet(int $userId, bool $isSet): void
+    {
+        $db  = db_connect();
+        $now = date('Y-m-d H:i:s');
+
+        $exists = $db->table('user_profiles')->where('user_id', $userId)->countAllResults() > 0;
+
+        if ($exists) {
+            $db->table('user_profiles')->where('user_id', $userId)
+                ->update(['password_set' => $isSet ? 1 : 0, 'updated_at' => $now]);
+        } else {
+            $db->table('user_profiles')->insert([
+                'user_id'      => $userId,
+                'password_set' => $isSet ? 1 : 0,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ]);
+        }
+    }
+
+    // ==================== Helpers ====================
+
+    protected function assertValidPassword(string $password): void
+    {
+        if (strlen($password) < 8) {
+            throw new \RuntimeException('Mật khẩu phải có ít nhất 8 ký tự');
+        }
+        if (strlen($password) > 72) {
+            throw new \RuntimeException('Mật khẩu tối đa 72 ký tự');
+        }
+    }
+
+    protected function emailExists(string $email): bool
+    {
+        return $this->identityProvider
+            ->where('type', 'email_password')
+            ->where('secret', $email)
+            ->first() !== null;
+    }
+
+    protected function usernameExists(string $username): bool
+    {
+        return $this->userProvider->where('username', $username)->first() !== null;
+    }
+
+    protected function findUserByEmail(string $email): ?User
+    {
+        $identity = $this->identityProvider
+            ->where('type', 'email_password')
+            ->where('secret', $email)
+            ->first();
+
+        return $identity === null ? null : $this->userProvider->findById($identity->user_id);
+    }
+
     protected function generateToken(User $user, int $lifetime = 604800): string
     {
         $accessToken = $user->generateAccessToken('api-token');
@@ -426,31 +419,28 @@ class AuthService
     }
 
     /**
-     * Format user data for API response
+     * public: OAuthService dùng lại để trả cùng định dạng.
      */
-    protected function formatUser(User $user): array
+    public function formatUser(User $user): array
     {
-        $groups = $user->getGroups();
-        $permissions = $user->getPermissions();
-
         return [
-            'id'          => $user->id,
-            'email'       => $user->email,
-            'username'    => $user->username ?? '',
-            'groups'      => $groups,
-            'permissions' => array_keys($permissions),
-            'created_at'  => $user->created_at?->format('Y-m-d H:i:s'),
-            'is_active'   => $user->isActivated(),
+            'id'                   => $user->id,
+            'email'                => $user->email,
+            'username'             => $user->username ?? '',
+            'groups'               => $user->getGroups(),
+            'permissions'          => array_keys($user->getPermissions()),
+            'created_at'           => $user->created_at?->format('Y-m-d H:i:s'),
+            'is_active'            => $user->isActivated(),
+            'needs_password_setup' => $this->needsPasswordSetup((int) $user->id),
         ];
     }
 
-    /**
-     * Get user profile with additional fields
-     */
+    // ==================== Profile ====================
+
     public function getUserProfile(int $userId): ?array
     {
         $profileModel = new UserProfileModel();
-        $profile = $profileModel->find($userId);
+        $profile      = $profileModel->find($userId);
 
         if ($profile === null) {
             return null;
@@ -466,34 +456,21 @@ class AuthService
         ];
     }
 
-    /**
-     * Update user profile
-     */
     public function updateProfile(int $userId, array $data): bool
     {
         $profileModel = new UserProfileModel();
+        $profileData  = ['user_id' => $userId];
 
-        $profileData = [
-            'user_id' => $userId,
-        ];
-
-        if (isset($data['display_name'])) {
-            $profileData['display_name'] = $data['display_name'];
-        }
-        if (isset($data['avatar'])) {
-            $profileData['avatar'] = $data['avatar'];
-        }
-        if (isset($data['phone'])) {
-            $profileData['phone'] = $data['phone'];
-        }
-        if (isset($data['bio'])) {
-            $profileData['bio'] = $data['bio'];
+        foreach (['display_name', 'avatar', 'phone', 'bio'] as $field) {
+            if (isset($data[$field])) {
+                $profileData[$field] = $data[$field];
+            }
         }
 
         $existing = $profileModel->find($userId);
 
         if ($existing === null) {
-            return $profileModel->insert($profileData);
+            return (bool) $profileModel->insert($profileData);
         }
 
         return $profileModel->update($userId, $profileData);

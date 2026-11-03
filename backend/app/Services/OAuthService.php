@@ -225,6 +225,11 @@ class OAuthService
                 return null;
             }
             
+            if (empty($userInfo['email_verified'])) {
+                log_message('error', 'Google email chưa được xác minh');
+                return null;
+            }
+
             return [
                 'provider'     => 'google',
                 'provider_id'  => (string) $userInfo['sub'],
@@ -290,6 +295,8 @@ class OAuthService
      */
     public function handleOAuthUser(array $providerData): array
     {
+        $isNewUser = false;
+
         // 1. Check if user already exists via OAuth identity
         $existingIdentity = $this->identityProvider
             ->where('type', 'oauth_' . $providerData['provider'])
@@ -323,6 +330,7 @@ class OAuthService
                 ]);
             } else {
                 // 3. Create brand-new user with random password
+                $isNewUser = true;
                 $cleanName = !empty($providerData['name']) 
                     ? preg_replace('/[^a-zA-Z0-9_]/', '', strtolower(str_replace(' ', '_', $providerData['name'])))
                     : explode('@', $providerData['email'])[0];
@@ -362,30 +370,34 @@ class OAuthService
             }
         }
         
-        // Update avatar if provided
-        if (!empty($providerData['avatar']) && isset($user->id)) {
-            try {
-                $profileModel = new \App\Models\UserProfileModel();
-                $existingProfile = $profileModel->find($user->id);
-                
-                if ($existingProfile === null) {
-                    $profileModel->insert([
-                        'user_id' => $user->id,
-                        'avatar'  => $providerData['avatar'],
-                    ]);
-                } elseif (empty($existingProfile['avatar'])) {
-                    $profileModel->update($user->id, ['avatar' => $providerData['avatar']]);
-                }
-            } catch (\Throwable $e) {
-                log_message('error', 'Update avatar error: ' . $e->getMessage());
+        // Đồng bộ profile: avatar + cờ "chưa đặt mật khẩu" cho tài khoản mới
+        try {
+            $db      = db_connect();
+            $now     = date('Y-m-d H:i:s');
+            $profile = $db->table('user_profiles')->where('user_id', $user->id)->get()->getRowArray();
+
+            if ($profile === null) {
+                $db->table('user_profiles')->insert([
+                    'user_id'      => $user->id,
+                    'display_name' => $providerData['name'] !== '' ? mb_substr($providerData['name'], 0, 100) : null,
+                    'avatar'       => $providerData['avatar'] ?: null,
+                    'password_set' => $isNewUser ? 0 : 1,
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
+                ]);
+            } elseif (empty($profile['avatar']) && ! empty($providerData['avatar'])) {
+                $db->table('user_profiles')->where('user_id', $user->id)
+                    ->update(['avatar' => $providerData['avatar'], 'updated_at' => $now]);
             }
+        } catch (\Throwable $e) {
+            log_message('error', 'Sync OAuth profile error: ' . $e->getMessage());
         }
-        
+
         // Generate Shield access token
         $token = $this->generateToken($user);
         
         return [
-            'user'  => $this->formatUser($user),
+            'user'  => (new AuthService())->formatUser($user),
             'token' => $token,
         ];
     }
@@ -402,24 +414,5 @@ class OAuthService
         ]);
 
         return $accessToken->raw_token;
-    }
-    
-    /**
-     * Format user data for response
-     */
-    protected function formatUser(User $user): array
-    {
-        $groups = $user->getGroups();
-        $permissions = $user->getPermissions();
-        
-        return [
-            'id'          => $user->id,
-            'email'       => $user->email,
-            'username'    => $user->username ?? '',
-            'groups'      => $groups,
-            'permissions' => array_keys($permissions),
-            'created_at'  => $user->created_at?->format('Y-m-d H:i:s'),
-            'is_active'   => $user->isActivated(),
-        ];
     }
 }

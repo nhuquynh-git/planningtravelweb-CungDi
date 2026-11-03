@@ -137,48 +137,55 @@ export function AuthProvider({ children }) {
     }
   }, [saveSession]);
 
-  // Xác nhận OTP 6 số
-  const verifyOtp = async ({ email, otp }) => {
+  const clearError = useCallback(() => setError(null), []);
+
+  // Xác nhận OTP 6 số -> backend tạo tài khoản + trả token
+  const verifyOtp = useCallback(async ({ email, otp }) => {
     try {
-      clearError();
+      const response = await api.post('/auth/verify-otp', { email, otp });
+      const { user, token } = response.data || {};
 
-      const response = await api.post("/auth/verify-otp", {
-        email,
-        otp,
-      });
-
-      const user = response.data?.data?.user;
-      const token = response.data?.data?.token;
-
-      if (!user || !token) {
-        throw new Error("Dữ liệu xác minh OTP không hợp lệ");
+      if (response.status !== 'success' || !user || !token) {
+        throw new Error(response.message || 'Dữ liệu xác minh OTP không hợp lệ');
       }
 
-      localStorage.setItem("accessToken", token);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      setUser(user);
-      setIsAuthenticated(true);
-
-      return {
-        success: true,
-        user,
-        token,
-      };
+      saveSession(user, token);
+      return { success: true, user, token };
     } catch (err) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Xác minh OTP thất bại";
-
-      setError(message);
-
-      return {
-        success: false,
-        message,
-      };
+      return { success: false, message: err.message || 'Xác minh OTP thất bại' };
     }
-  };
+  }, [saveSession]);
+
+  // Quên mật khẩu: gửi mã
+  const forgotPassword = useCallback(async (email) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return { success: true, message: response.message, otpPreview: response.data?.otp_preview };
+    } catch (err) {
+      return { success: false, error: err.message || 'Không thể gửi mã' };
+    }
+  }, []);
+
+  // Quên mật khẩu: đổi mật khẩu bằng mã
+  const resetPassword = useCallback(async ({ email, otp, password }) => {
+    try {
+      const response = await api.post('/auth/reset-password', { email, otp, password });
+      return { success: true, message: response.message };
+    } catch (err) {
+      return { success: false, error: err.message || 'Đặt lại mật khẩu thất bại' };
+    }
+  }, []);
+
+  // Đặt mật khẩu lần đầu (tài khoản Google/Facebook)
+  const setInitialPassword = useCallback(async (password) => {
+    try {
+      await api.post('/auth/set-password', { password });
+      await fetchCurrentUser(); // cập nhật needs_password_setup = false
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Thiết lập mật khẩu thất bại' };
+    }
+  }, [fetchCurrentUser]);
 
   // Gửi lại OTP
   const resendOtp = useCallback(async (email) => {
@@ -260,10 +267,14 @@ export function AuthProvider({ children }) {
     login,
     verifyOtp,     // mới
     resendOtp,     // mới
+    forgotPassword,
+    resetPassword,
+    setInitialPassword,
+    needsPasswordSetup: !!user?.needs_password_setup,
     logout,
     updateProfile,
     fetchCurrentUser,
-    clearError: () => setError(null),
+    clearError,
   };
 
   return (
