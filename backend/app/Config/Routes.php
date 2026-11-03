@@ -27,6 +27,7 @@ $routes->group('api', ['filter' => 'cors'], function ($routes) {
 
         // Quên mật khẩu (MỚI)
         $routes->post('forgot-password', 'Api\Auth::forgotPassword');
+        $routes->post('verify-reset-otp', 'Api\Auth::verifyResetOtp');
         $routes->post('reset-password', 'Api\Auth::resetPassword');
 
         // OAuth Routes - Google & Facebook

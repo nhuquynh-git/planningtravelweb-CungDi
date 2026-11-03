@@ -208,6 +208,25 @@ class Auth extends BaseApiController
     }
 
     /**
+     * POST /api/auth/verify-reset-otp  { email, otp }
+     * Chỉ kiểm tra mã; mã được dùng lại ở bước reset-password.
+     */
+    public function verifyResetOtp(): ResponseInterface
+    {
+        try {
+            $data = $this->request->getJSON(true) ?? [];
+            $this->authService->verifyResetOtp((string) ($data['email'] ?? ''), (string) ($data['otp'] ?? ''));
+
+            return $this->success(null, 'Mã xác nhận hợp lệ');
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            log_message('error', 'Auth verifyResetOtp error: ' . $e->getMessage());
+            return $this->error('Xác minh mã thất bại', 500);
+        }
+    }
+
+    /**
      * POST /api/auth/reset-password  { email, otp, password }
      */
     public function resetPassword(): ResponseInterface

@@ -295,6 +295,15 @@ class AuthService
         return $result;
     }
 
+    /**
+     * Bước 2 của quên mật khẩu: chỉ kiểm tra mã, KHÔNG tiêu thụ mã.
+     * Mã vẫn dùng được ở bước đặt mật khẩu (resetPassword).
+     */
+    public function verifyResetOtp(string $email, string $otp): void
+    {
+        $this->otp->verify(strtolower(trim($email)), OtpService::PURPOSE_RESET, $otp, false);
+    }
+
     public function resetPassword(string $email, string $otp, string $newPassword): array
     {
         $email = strtolower(trim($email));

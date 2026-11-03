@@ -166,6 +166,16 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Quên mật khẩu: kiểm tra mã (chưa đổi mật khẩu)
+  const verifyResetOtp = useCallback(async ({ email, otp }) => {
+    try {
+      await api.post('/auth/verify-reset-otp', { email, otp });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Mã xác nhận không đúng' };
+    }
+  }, []);
+
   // Quên mật khẩu: đổi mật khẩu bằng mã
   const resetPassword = useCallback(async ({ email, otp, password }) => {
     try {
@@ -268,6 +278,7 @@ export function AuthProvider({ children }) {
     verifyOtp,     // mới
     resendOtp,     // mới
     forgotPassword,
+    verifyResetOtp,
     resetPassword,
     setInitialPassword,
     needsPasswordSetup: !!user?.needs_password_setup,
