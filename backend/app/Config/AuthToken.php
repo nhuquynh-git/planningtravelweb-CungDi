@@ -52,8 +52,10 @@ class AuthToken extends ShieldAuthToken
      * --------------------------------------------------------------------
      * Determines the amount of time, in seconds, that an unused token can
      * be used.
+     * 
+     * Spec requirement: 7 days of inactivity (Q-015b)
      */
-    public int $unusedTokenLifetime = YEAR;
+    public int $unusedTokenLifetime = 7 * DAY;
 
     /**
      * --------------------------------------------------------------------
